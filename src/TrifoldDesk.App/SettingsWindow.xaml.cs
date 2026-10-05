@@ -11,8 +11,7 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent(); _original = settings;
         OpacitySlider.Value = settings.GlassOpacity;
-        IdleCheck.IsChecked = settings.TransparentIdle; HoverCheck.IsChecked = settings.HoverExpand;
-        AutoCheck.IsChecked = settings.AutoCollapse; TopCheck.IsChecked = settings.AlwaysOnTop;
+        IdleCheck.IsChecked = settings.TransparentIdle;
         AnimationCheck.IsChecked = settings.AnimationsEnabled; StartupCheck.IsChecked = settings.StartWithWindows;
         var screens = new List<Choice> { new("", "自动 · 主显示器") };
         screens.AddRange(Forms.Screen.AllScreens.Select(s => new Choice(s.DeviceName, $"{s.DeviceName} · {s.Bounds.Width} × {s.Bounds.Height}")));
@@ -28,8 +27,8 @@ public partial class SettingsWindow : Window
         Result = new AppSettings
         {
             GlassOpacity = OpacitySlider.Value, IsCollapsed = _original.IsCollapsed,
-            TransparentIdle = IdleCheck.IsChecked == true, HoverExpand = HoverCheck.IsChecked == true,
-            AutoCollapse = AutoCheck.IsChecked == true, AlwaysOnTop = TopCheck.IsChecked == true,
+            TransparentIdle = IdleCheck.IsChecked == true, HoverExpand = false,
+            AutoCollapse = false, AlwaysOnTop = false,
             AnimationsEnabled = AnimationCheck.IsChecked == true, StartWithWindows = StartupCheck.IsChecked == true,
             MonitorDevice = MonitorCombo.SelectedValue as string ?? "", NetworkInterfaceId = NetworkCombo.SelectedValue as string ?? ""
         };

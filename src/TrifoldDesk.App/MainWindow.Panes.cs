@@ -17,7 +17,7 @@ public partial class MainWindow
         var menu = new ContextMenu(); ContextMenu = menu;
         menu.Opened += (_,_) => _menuOpen = true;
         menu.Closed += (_,_) => _menuOpen = false;
-        foreach (var (label,action) in new (string,Action)[] { ("插件库",()=>PluginLibraryClick(this,new RoutedEventArgs())), ("入口管理",()=>OpenManagementClick(this,new RoutedEventArgs())), ("个性化",()=>OpenAppearanceClick(this,new RoutedEventArgs())), ("全部收起",()=>SetCollapsed(true)) })
+        foreach (var (label,action) in new (string,Action)[] { ("插件库",()=>PluginLibraryClick(this,new RoutedEventArgs())), ("入口管理",()=>OpenManagementClick(this,new RoutedEventArgs())), ("个性化",()=>OpenAppearanceClick(this,new RoutedEventArgs())), ("设置",()=>OpenSettings()), ("全部收起",()=>SetCollapsed(true)) })
         { var entry=new MenuItem { Header=label }; entry.Click+=(_,_)=>action(); menu.Items.Add(entry); }
         menu.Items.Add(new Separator());
         for (int n=0;n<3;n++)

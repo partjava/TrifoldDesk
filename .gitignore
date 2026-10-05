@@ -19,3 +19,6 @@
 **/.vs/
 *.user
 *.suo
+
+!/BuildInstaller.ps1
+!/installer/

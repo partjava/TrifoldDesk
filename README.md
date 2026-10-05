@@ -19,22 +19,22 @@ Windows 桌面整理工具：用左、中、右三个可独立折叠的页面，
 
 ## 下载运行
 
-[下载 Windows x64 免安装版](https://github.com/partjava/TrifoldDesk/releases/latest)。下载 ZIP 后完整解压，双击“启动三折桌面.bat”。需要 .NET 8 Windows Desktop Runtime x64；请保留整个解压目录。
+[下载 Windows x64 中文安装包](https://github.com/partjava/TrifoldDesk/releases/latest)。下载 Setup EXE 后双击，按向导选择安装位置。安装版内置运行环境，无需单独安装 .NET；支持开始菜单、可选桌面快捷方式、开机自启动与卸载。旧版 ZIP 免安装包仍需 .NET 8 Windows Desktop Runtime。
 
 ## 从源码构建
 
-当前版本为 **0.10.9**。适用于 Windows 10/11 x64。
+当前版本为 **0.10.12**。适用于 Windows 10/11 x64。
 
 安装 .NET 8 SDK，或具备 .NET 8 目标框架支持的更新 SDK，然后在项目根目录打开 PowerShell：
 
 ```powershell
 git clone https://github.com/partjava/TrifoldDesk.git
 cd TrifoldDesk
-.\Build.ps1 -Test -Version '0.10.9'
+.\Build.ps1 -Test -Version '0.10.12'
 .\启动三折桌面.bat
 ```
 
-构建结果位于 `dist/v0.10.9/`。运行需要 **.NET 8 Windows Desktop Runtime x64**，请保留整个发布目录，不能只复制 EXE。
+构建结果位于 `dist/v0.10.12/`。运行需要 **.NET 8 Windows Desktop Runtime x64**，请保留整个发布目录，不能只复制 EXE。
 
 ## 使用
 
@@ -77,3 +77,7 @@ home.png                 桌面效果图
 ```
 
 `Build.ps1 -Test` 会执行核心检查与独立数据目录下的窗口自测。更多说明见 [开发说明](docs/开发说明.md)。
+
+## 构建安装包
+
+安装 Inno Setup 6.7 或更新版本后，运行 BuildInstaller.ps1 -CompilerPath '你的 ISCC.exe 路径'。脚本发布 Windows x64 自包含程序，并编译 installer/TrifoldDesk.iss；需要访问官方 NuGet 包源。输出在 dist/installers。

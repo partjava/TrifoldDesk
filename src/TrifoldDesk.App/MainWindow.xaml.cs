@@ -34,6 +34,8 @@ public partial class MainWindow : Window
         Icon=System.Windows.Media.Imaging.BitmapFrame.Create(new Uri("pack://application:,,,/Assets/AppIcon.ico"));
         _config = new ConfigManager(App.DataDirectory);
         var settings = _config.Load<AppSettings>("settings.json"); _settings = settings.Value;
+        // Legacy panel preferences must not override permanent desktop behavior.
+        _settings.AlwaysOnTop = false; _settings.AutoCollapse = false; _settings.HoverExpand = false; _settings.IsCollapsed = false;
         if(!App.IsSelfTest)_settings.StartWithWindows=SystemActionService.AutoStartRegistered();
         _settings.GlassOpacity = Math.Clamp(_settings.GlassOpacity, .05, .55);
         var shortcuts = _config.Load<ShortcutConfig>("shortcuts.json");
@@ -298,7 +300,7 @@ public partial class MainWindow : Window
         if (_frames.Values.Any(f => f.InteractionActive) || OwnedWindows.Cast<Window>().Any(w => w.IsVisible && w.IsActive)) { _leftAt = DateTime.UtcNow; return; }
         double seconds = (DateTime.UtcNow - _leftAt).TotalSeconds;
         if (seconds > 1.2) ApplyGlass(true);
-        if (seconds > 3 && _settings.AutoCollapse) SetCollapsed(true);
+        // The desktop stays expanded until explicitly collapsed by the user.
     }
     public void Exit()
     {

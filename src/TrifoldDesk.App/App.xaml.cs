@@ -345,6 +345,27 @@ public partial class App : Application
             var appBitmap=new System.Windows.Media.Imaging.RenderTargetBitmap((int)appPicker.ActualWidth,(int)appPicker.ActualHeight,96,96,PixelFormats.Pbgra32);appBitmap.Render(appPicker);
             var appEncoder=new System.Windows.Media.Imaging.PngBitmapEncoder();appEncoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(appBitmap));using(var appFile=File.Create(Path.Combine(DataDirectory,"installed-apps.png")))appEncoder.Save(appFile);appPicker.Close();
             using (var settings = new SettingsWindowForTestScope(window)) { Check(settings.Ready, "settings window XAML loads"); }
+            var readableSettings = new SettingsWindow(new AppSettings()) { Owner=window }; readableSettings.Show(); await Task.Delay(150); readableSettings.UpdateLayout();
+            IEnumerable<TextBlock> VisibleText(DependencyObject root)
+            {
+                if(root is TextBlock text) yield return text;
+                for(int child=0;child<VisualTreeHelper.GetChildrenCount(root);child++)
+                    foreach(var textChild in VisibleText(VisualTreeHelper.GetChild(root,child))) yield return textChild;
+            }
+            bool DarkText(DependencyObject root)
+            {
+                var labels=VisibleText(root).Where(t=>!string.IsNullOrWhiteSpace(t.Text)).ToArray();
+                return labels.Length>0 && labels.All(t=>t.Foreground is SolidColorBrush brush && brush.Color.R<80 && brush.Color.G<80 && brush.Color.B<80);
+            }
+            var monitorChoice=(ComboBox)readableSettings.FindName("MonitorCombo"); var networkChoice=(ComboBox)readableSettings.FindName("NetworkCombo");
+            Check(DarkText(monitorChoice)&&DarkText(networkChoice),"settings selected monitor and network text contrasts with light background");
+            networkChoice.IsDropDownOpen=true; await Task.Delay(100); networkChoice.UpdateLayout();
+            var networkItem=(ComboBoxItem)networkChoice.ItemContainerGenerator.ContainerFromIndex(0);
+            Check(networkItem!=null&&DarkText(networkItem),"settings expanded network choice uses readable dark text");
+            networkChoice.IsDropDownOpen=false;
+            var settingsBitmap=new System.Windows.Media.Imaging.RenderTargetBitmap((int)readableSettings.ActualWidth,(int)readableSettings.ActualHeight,96,96,PixelFormats.Pbgra32); settingsBitmap.Render(readableSettings);
+            var settingsEncoder=new System.Windows.Media.Imaging.PngBitmapEncoder(); settingsEncoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(settingsBitmap)); using(var settingsFile=File.Create(Path.Combine(DataDirectory,"settings-readable.png")))settingsEncoder.Save(settingsFile);
+            readableSettings.Close();
             Check(_selfTestFailure == null, "no unhandled XAML or UI exceptions");
             lines.Add("Hardware counters are environment-dependent; unavailable CPU is reported honestly.");
             File.WriteAllLines(Path.Combine(DataDirectory, "self-test.txt"), lines);
