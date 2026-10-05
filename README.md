@@ -17,9 +17,13 @@ Windows 桌面整理工具：用左、中、右三个可独立折叠的页面，
 
 操作集中在右键菜单，桌面仅保留内容与必要的控件。
 
-## 构建和运行
+## 下载运行
 
-目前仓库提供源码，开发版本为 **0.10.9**。适用于 Windows 10/11 x64。
+[下载 Windows x64 免安装版](https://github.com/partjava/TrifoldDesk/releases/latest)。下载 ZIP 后完整解压，双击“启动三折桌面.bat”。需要 .NET 8 Windows Desktop Runtime x64；请保留整个解压目录。
+
+## 从源码构建
+
+当前版本为 **0.10.9**。适用于 Windows 10/11 x64。
 
 安装 .NET 8 SDK，或具备 .NET 8 目标框架支持的更新 SDK，然后在项目根目录打开 PowerShell：
 
