@@ -53,7 +53,7 @@ public sealed class WidgetFrame : Border
         else Background = Brushes.Transparent; ClipToBounds = true;
         if (model.PluginId == "folder") CornerRadius = new CornerRadius(10);
         bool folderFrame = model.PluginId == "folder";
-        var grid = new Grid(); grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(folderFrame ? 4 : 36) }); grid.RowDefinitions.Add(new RowDefinition()); Child = grid;
+        var grid = new Grid(); grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(folderFrame ? 4 : model.PluginId == "clock" ? 12 : 36) }); grid.RowDefinitions.Add(new RowDefinition()); Child = grid;
         var header = new Grid { Margin = new Thickness(12, 0, 10, 0) }; grid.Children.Add(header);
         _move.Cursor = Cursors.SizeAll; _move.Background = Brushes.Transparent;
         var transparent = new FrameworkElementFactory(typeof(Border)); transparent.SetValue(Border.BackgroundProperty, Brushes.Transparent);
@@ -192,7 +192,7 @@ public sealed class WidgetFrame : Border
     }
     private void UpdateState()
     {
-        _title.Text = string.IsNullOrWhiteSpace(Model.Title) ? PluginRules.Catalog.First(p => p.Id == Model.PluginId).Name : Model.Title;
+        _title.Visibility = Model.PluginId is "clock" or "folder" ? Visibility.Collapsed : Visibility.Visible; _title.Text = string.IsNullOrWhiteSpace(Model.Title) ? PluginRules.Catalog.First(p => p.Id == Model.PluginId).Name : Model.Title;
         if (_body is FolderWidget) ToolTip=_title.Text;
         _fold.Content = Model.IsCollapsed ? "展开" : "收起"; _lock.Content = Model.IsLocked ? "锁定" : "自由";
         bool phone = Model.IsCollapsed && _body is FolderWidget;

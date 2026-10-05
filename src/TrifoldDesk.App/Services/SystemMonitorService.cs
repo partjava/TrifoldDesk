@@ -5,7 +5,7 @@ using System.Windows.Threading;
 
 namespace TrifoldDesk.Services;
 public sealed record NetworkChoice(string Id, string Name);
-public sealed record MonitorSnapshot(double? Cpu, double? MemoryPercent, string MemoryText, string Download, string Upload, double? DiskFreeGb, double? DiskUsedPercent, string DiskName, string NetworkName, double? DownloadRate = null);
+public sealed record MonitorSnapshot(double? Cpu, double? MemoryPercent, string MemoryText, string Download, string Upload, double? DiskFreeGb, double? DiskUsedPercent, string DiskName, string NetworkName, double? DownloadRate = null, double? UploadRate = null);
 public sealed class SystemMonitorService : IDisposable
 {
     private readonly DispatcherTimer _timer;
@@ -77,7 +77,7 @@ public sealed class SystemMonitorService : IDisposable
         string memoryText = hasMemory ? $"{(memory.TotalPhysical - memory.AvailablePhysical) / 1073741824d:0.0} / {memory.TotalPhysical / 1073741824d:0.0} GB" : "暂不可用";
         double? free = null, diskPercent = null; string diskName = Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\";
         // Drive I/O is isolated in DiskMonitorService so network/removable drives cannot block CPU/network updates.
-        string down = "—", up = "—", networkName = "无连接"; double? downloadRate = null;
+        string down = "—", up = "—", networkName = "无连接"; double? downloadRate = null, uploadRate = null;
         if (networkEnabled) try
         {
             var interfaces = ActiveInterfaces();
@@ -91,7 +91,7 @@ public sealed class SystemMonitorService : IDisposable
                 {
                     double elapsed = (now - _timestamp) / (double)Stopwatch.Frequency;
                     downloadRate = RateMath.BytesPerSecond(bytes.BytesReceived, _received, elapsed); down = FormatRate(downloadRate.Value);
-                    up = FormatRate(RateMath.BytesPerSecond(bytes.BytesSent, _sent, elapsed));
+                    uploadRate = RateMath.BytesPerSecond(bytes.BytesSent, _sent, elapsed); up = FormatRate(uploadRate.Value);
                 }
                 _lastNetworkId = nic.Id; _received = bytes.BytesReceived; _sent = bytes.BytesSent; _timestamp = now; networkName = nic.Name;
             }
@@ -99,7 +99,7 @@ public sealed class SystemMonitorService : IDisposable
         }
         catch (NetworkInformationException ex) { App.Log(ex); _lastNetworkId = ""; }
         if (!networkEnabled) _lastNetworkId = "";
-        return new(cpu, memoryPercent, memoryText, down, up, free, diskPercent, diskName, networkName, downloadRate);
+        return new(cpu, memoryPercent, memoryText, down, up, free, diskPercent, diskName, networkName, downloadRate, uploadRate);
     }
     private static NetworkInterface[] ActiveInterfaces() => NetworkInterface.GetAllNetworkInterfaces().Where(n =>
         n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType is not NetworkInterfaceType.Loopback and not NetworkInterfaceType.Tunnel).ToArray();

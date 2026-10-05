@@ -97,6 +97,7 @@ public sealed class MainViewModel : Observable
     public string UploadText => "↑ " + (_snapshot?.Upload ?? "—");
     public string NetworkName => _snapshot?.NetworkName ?? "连接状态";
     public double? DownloadRate => _snapshot?.DownloadRate;
+    public double? UploadRate => _snapshot?.UploadRate;
     public string DiskText => _snapshot?.DiskFreeGb is double free ? $"{free:0.0} GB 可用" : "读取系统盘";
     public string DiskLabel => (_snapshot?.DiskName ?? "系统盘") + " · 存储";
     public double DiskValue => _snapshot?.DiskUsedPercent ?? 0;

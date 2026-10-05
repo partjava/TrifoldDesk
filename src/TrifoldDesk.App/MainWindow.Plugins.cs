@@ -249,6 +249,7 @@ public partial class MainWindow
     internal void TestFolderDropGrid(string id,bool value)=>_folderViews[id].TestDropGrid(value);
     internal double TestFolderScroll(string id)=>_folderViews[id].TestScrollToEnd();
     internal DashboardWidget TestDashboard(string id) => _dashboards[id];
+    internal MainViewModel TestMonitorModel => _viewModel;
     internal CombinedStatusWidget TestSummary(string id) => ((Grid)_frames[id].Child).Children.OfType<Border>().Select(b=>b.Child).OfType<CombinedStatusWidget>().Single();
     private void ChangeWidgetTheme(string id, string style) { var next = PluginRules.Clone(_widgets); var item = next.Items.FirstOrDefault(i => i.InstanceId == id); if (item == null) return; item.Style = style; SaveWidgetConfig(next); }
 }
