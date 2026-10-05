@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable><ImplicitUsings>disable</ImplicitUsings>
+    <PlatformTarget>x64</PlatformTarget><AssemblyName>TrifoldDesk</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/AppIcon.ico</ApplicationIcon>
+    <Version>0.9.3</Version>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../TrifoldDesk.Core/TrifoldDesk.Core.csproj" /></ItemGroup>
+  <ItemGroup><Resource Include="Assets/AppIcon.ico" /></ItemGroup>
+</Project>

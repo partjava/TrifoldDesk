@@ -1,0 +1,21 @@
+# 仅跟踪发布源码所需文件；本地研究、截图和构建产物保留在电脑上。
+/*
+!/.gitignore
+!/README.md
+!/home.png
+!/Build.ps1
+!/AutoStart.vbs
+!/启动三折桌面.bat
+!/current-version.txt
+!/Directory.Build.props
+!/NuGet.Config
+!/src/
+!/tests/
+!/docs/
+/docs/*
+!/docs/开发说明.md
+**/bin/
+**/obj/
+**/.vs/
+*.user
+*.suo

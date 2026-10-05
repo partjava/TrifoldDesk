@@ -1,0 +1,6 @@
+<Window x:Class="TrifoldDesk.HandleWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="TrifoldDesk Handle" Width="16" Height="160" WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True" Background="Transparent" ShowInTaskbar="False" ShowActivated="False">
+ <Border Background="#25FFFFFF" BorderBrush="#45FFFFFF" BorderThickness="1" CornerRadius="8" Cursor="Hand" ToolTip="单击展开或收起 · 右键更多操作" MouseLeftButtonUp="HandleClick" MouseEnter="HandleEnter" MouseLeave="HandleLeave">
+  <Border.ContextMenu><ContextMenu Opened="MenuOpened" Closed="MenuClosed"><MenuItem Header="展开" Click="RevealClick"/><MenuItem Header="设置" Click="SettingsClick"/><Separator/><MenuItem Header="退出" Click="ExitClick"/></ContextMenu></Border.ContextMenu>
+  <StackPanel VerticalAlignment="Center"><TextBlock Text="‹" HorizontalAlignment="Center" FontSize="15" x:Name="Arrow"/><Border Width="2" Height="34" Background="#9000E5FF" CornerRadius="1" Margin="0,12,0,0" HorizontalAlignment="Center"/></StackPanel>
+ </Border>
+</Window>
