@@ -4,12 +4,14 @@ public sealed class FolderData
 {
     public string Id { get; set; } = "";
     public string Name { get; set; } = "应用文件夹";
+    public string DirectoryPath { get; set; } = "";
+    public string ParentFolderId { get; set; } = "";
     public List<ShortcutItem> Items { get; set; } = [];
     public Dictionary<string,int> Slots { get; set; } = [];
 }
 public sealed class FolderConfig
 {
-    public int SchemaVersion { get; set; } = 1;
+    public int SchemaVersion { get; set; } = 2;
     public List<FolderData> Items { get; set; } = [];
     public List<DesktopEntry> DesktopEntries { get; set; } = [];
 }

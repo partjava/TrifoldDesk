@@ -14,6 +14,8 @@
 !/docs/
 /docs/*
 !/docs/开发说明.md
+!/docs/插件协议.md
+!/docs/功能状态.md
 **/bin/
 **/obj/
 **/.vs/

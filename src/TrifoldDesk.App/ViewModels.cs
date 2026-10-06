@@ -28,7 +28,8 @@ public sealed class ShortcutViewModel : Observable
         {
             var current = ShellLinkHelper.CreateShortcut(Item.SourcePath, Item.ScreenIndex, Item.Order);
             if (Item.TargetPath != current.TargetPath || Item.IconPath != current.IconPath || Item.IconIndex != current.IconIndex) ShellLinkHelper.InvalidateIcon(Item.SourcePath);
-            Item.TargetPath = current.TargetPath; Item.Arguments = current.Arguments; Item.WorkingDirectory = current.WorkingDirectory;
+            Item.TargetPath = current.TargetPath;
+            if(Item.LaunchMode=="shell"){Item.Arguments = current.Arguments; Item.WorkingDirectory = current.WorkingDirectory;}
             Item.IconPath = current.IconPath; Item.IconIndex = current.IconIndex;
         }
         Icon = ShellLinkHelper.GetIcon(Item); Changed(nameof(Icon)); Changed(nameof(Name)); Changed(nameof(Tooltip)); Changed(nameof(IsMissing)); Changed(nameof(Group)); Changed(nameof(ScreenName));

@@ -17,5 +17,6 @@ public sealed class TrayService : IDisposable
         _icon = new Forms.NotifyIcon { Text = "TrifoldDesk · 三折桌面", Icon = _appIcon, ContextMenuStrip = menu, Visible = true };
         _icon.DoubleClick += (_, _) => reveal();
     }
+    public void Notify(string title,string message)=>_icon.ShowBalloonTip(10000,title,message,Forms.ToolTipIcon.Info);
     public void Dispose() { _icon.Visible = false; _icon.ContextMenuStrip?.Dispose(); _icon.Dispose(); _appIcon.Dispose(); }
 }

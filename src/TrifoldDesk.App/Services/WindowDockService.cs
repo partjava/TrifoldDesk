@@ -36,6 +36,7 @@ public static class WindowDockService
     private static void Position(Window window, int x, int y, int width, int height)
     {
         var hwnd = new WindowInteropHelper(window).Handle;
+        if(hwnd!=IntPtr.Zero && (GetWindowLongPtr(hwnd,-16).ToInt64()&0x40000000L)!=0){var origin=new POINT(x,y);MapWindowPoints(IntPtr.Zero,GetParent(hwnd),ref origin,1);x=origin.X;y=origin.Y;}
         if (hwnd != IntPtr.Zero) SetWindowPos(hwnd, IntPtr.Zero, x, y, width, height, 0x14); // NOZORDER | NOACTIVATE
     }
     public static void RaiseHandle(Window handle) { if(handle.Topmost)SetWindowPos(new WindowInteropHelper(handle).Handle, new IntPtr(-1),0,0,0,0,0x13);else KeepAtDesktop(handle); }
@@ -43,6 +44,7 @@ public static class WindowDockService
     {
         if(window.Topmost)return;
         var hwnd=new WindowInteropHelper(window).Handle;if(hwnd==IntPtr.Zero)return;
+        if((GetWindowLongPtr(hwnd,-16).ToInt64()&0x40000000L)!=0){SetWindowPos(hwnd,IntPtr.Zero,0,0,0,0,0x13);return;}
         // An owned window stays above its owner: keep the desktop visible behind us.
         var desktop=GetShellWindow();if(desktop!=IntPtr.Zero)SetWindowLongPtr(hwnd,-8,desktop);
         SetWindowPos(hwnd,new IntPtr(1),0,0,0,0,0x13);
@@ -60,6 +62,8 @@ public static class WindowDockService
         for(var hwnd=GetTopWindow(IntPtr.Zero);hwnd!=IntPtr.Zero;hwnd=GetWindow(hwnd,2)) {if(hwnd==a)return true;if(hwnd==b)return false;}return false;
     }
     [StructLayout(LayoutKind.Sequential)] private struct WINDOWPOS { public IntPtr Hwnd,After;public int X,Y,Cx,Cy;public uint Flags; }
+    [DllImport("user32.dll")] private static extern IntPtr GetParent(IntPtr hwnd);
+    [DllImport("user32.dll")] private static extern int MapWindowPoints(IntPtr from,IntPtr to,ref POINT point,uint count);
     [DllImport("user32.dll")] private static extern IntPtr GetShellWindow();
     [DllImport("user32.dll")] private static extern IntPtr GetTopWindow(IntPtr hwnd);
     [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr hwnd,uint command);

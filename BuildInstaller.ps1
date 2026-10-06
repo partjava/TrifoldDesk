@@ -1,4 +1,4 @@
-param([string]$CompilerPath, [string]$Version)
+﻿param([string]$CompilerPath, [string]$Version)
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 if (!$Version) { $Version = (Get-Content -LiteralPath current-version.txt -Raw).Trim() }

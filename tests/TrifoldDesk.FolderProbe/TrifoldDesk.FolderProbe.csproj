@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net8.0-windows10.0.19041.0</TargetFramework><UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><OutputType>Exe</OutputType><Nullable>enable</Nullable><PlatformTarget>x64</PlatformTarget></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../src/TrifoldDesk.App/TrifoldDesk.App.csproj"/><Resource Include="../../src/TrifoldDesk.App/Assets/AppIcon.ico" Link="Assets/AppIcon.ico"/></ItemGroup>
+</Project>

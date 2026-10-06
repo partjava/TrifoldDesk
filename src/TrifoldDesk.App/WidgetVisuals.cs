@@ -2,6 +2,7 @@ namespace TrifoldDesk;
 
 public sealed class AnalogClock : FrameworkElement
 {
+    private DrawingGroup? _face; private Size _faceSize; private Brush? _faceInk;
     public Brush Ink { get; set; } = Brushes.WhiteSmoke;
     public Brush Accent { get; set; } = Brushes.Turquoise;
     protected override void OnRender(DrawingContext dc)
@@ -10,12 +11,16 @@ public sealed class AnalogClock : FrameworkElement
         if (radius < 8) return;
         var center = new Point(ActualWidth / 2, ActualHeight / 2);
         Point At(double angle, double length) => new(center.X + Math.Sin(angle) * length, center.Y - Math.Cos(angle) * length);
-        dc.DrawEllipse(null, new Pen(new SolidColorBrush(Color.FromArgb(45, 210, 220, 225)), 1), center, radius, radius);
+        if(_face==null || _faceSize!=RenderSize || !ReferenceEquals(_faceInk,Ink))
+        { _face=new DrawingGroup(); _faceSize=RenderSize; _faceInk=Ink; using(var face=_face.Open()) {
+        face.DrawEllipse(null, new Pen(new SolidColorBrush(Color.FromArgb(45, 210, 220, 225)), 1), center, radius, radius);
         for (int n = 0; n < 60; n++)
         {
             double angle = n * Math.PI / 30;
-            dc.DrawLine(new Pen(Ink, n % 5 == 0 ? 1.5 : .6), At(angle, radius * (n % 5 == 0 ? .83 : .92)), At(angle, radius * .97));
+            face.DrawLine(new Pen(Ink, n % 5 == 0 ? 1.5 : .6), At(angle, radius * (n % 5 == 0 ? .83 : .92)), At(angle, radius * .97));
         }
+        } _face.Freeze(); }
+        dc.DrawDrawing(_face);
         var now = DateTime.Now;
         void Hand(double angle, double length, Brush brush, double thickness) => dc.DrawLine(new Pen(brush, thickness) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round }, center, At(angle, radius * length));
         Hand((now.Hour % 12 + now.Minute / 60d) * Math.PI / 6, .5, Ink, 3);
@@ -27,7 +32,8 @@ public sealed class AnalogClock : FrameworkElement
 
 public sealed class CapacityGauge : FrameworkElement
 {
-    public double Value { get; set; }
+    public double Value { get; private set; }
+    public void UpdateValue(double value) { if(Value.Equals(value))return; Value=value; if(TrifoldDesk.Services.RenderBudget.CanDraw(this))InvalidateVisual(); }
     public bool Segmented { get; set; }
     public Brush Accent { get; set; } = Brushes.Turquoise;
     protected override void OnRender(DrawingContext dc)

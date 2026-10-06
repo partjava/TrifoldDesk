@@ -17,12 +17,12 @@ public sealed class DiskMonitorService : IDisposable
     public event Action<IReadOnlyList<DriveSnapshot>>? Updated;
     public DiskMonitorService(Dispatcher dispatcher)
     {
-        _timer = new DispatcherTimer(DispatcherPriority.Background, dispatcher) { Interval = TimeSpan.FromSeconds(8) };
+        _timer = new DispatcherTimer(DispatcherPriority.Background, dispatcher) { Interval = TimeSpan.FromSeconds(30) };
         _timer.Tick += Tick;
     }
     public bool IsEnabled => _timer.IsEnabled;
     public void SetEnabled(bool enabled)
-    { if (_disposed) return; if (enabled) { _timer.Start(); _ = RefreshAsync(); } else _timer.Stop(); }
+    { if (_disposed || enabled == IsEnabled) return; if (enabled) { _timer.Start(); _ = RefreshAsync(); } else _timer.Stop(); }
     private async void Tick(object? sender, EventArgs e) => await RefreshAsync();
     private async Task RefreshAsync()
     {

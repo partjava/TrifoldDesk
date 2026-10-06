@@ -6,10 +6,15 @@
    <TextBlock Text="背景不透明度"/><Slider x:Name="OpacitySlider" Minimum="0.05" Maximum="0.55" TickFrequency="0.05" Margin="0,12,0,5"/><TextBlock Text="降低背景强度不会降低文字和图标清晰度" Foreground="{StaticResource Muted}" FontSize="11"/>
    <CheckBox x:Name="IdleCheck" Content="鼠标离开后进入透明待机"/>
    <CheckBox x:Name="AnimationCheck" Content="启用展开与收起动画"/>
+   <CheckBox x:Name="DesktopCheck" Content="附着桌面（不兼容时回退底层窗口）"/>
    <CheckBox x:Name="StartupCheck" Content="开机登录后自动运行"/>
    <TextBlock Text="停靠显示器" Margin="0,14,0,0"/><ComboBox x:Name="MonitorCombo" SelectedValuePath="Id"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" Foreground="#202830"/></DataTemplate></ComboBox.ItemTemplate></ComboBox>
    <TextBlock Text="网速统计接口"/><ComboBox x:Name="NetworkCombo" SelectedValuePath="Id"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" Foreground="#202830"/></DataTemplate></ComboBox.ItemTemplate></ComboBox>
    <TextBlock Text="自动模式选择一个有网关的联网接口；可手动选择 VPN 或物理网卡，避免多网卡重复汇总。" TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="11"/>
+   <TextBlock Text="监控显卡" Margin="0,14,0,0"/><ComboBox x:Name="GpuCombo" SelectedValuePath="Id"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" Foreground="#202830"/></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+   <TextBlock Text="温度与风扇读数在系统概览右键的硬件传感器中查看。" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource Muted}"/>
+   <TextBlock Text="配置与诊断" Margin="0,20,0,8"/>
+   <WrapPanel><Button x:Name="ProfileExportButton" Content="导出配置" Click="ProfileToolsClick" Margin="0,0,8,8"/><Button x:Name="ProfileImportButton" Content="导入配置" Click="ProfileToolsClick" Margin="0,0,8,8"/><Button x:Name="DiagnosticsButton" Content="启动诊断" Click="DiagnosticsClick" Margin="0,0,0,8"/></WrapPanel>
   </StackPanel></ScrollViewer>
  </DockPanel>
 </Window>

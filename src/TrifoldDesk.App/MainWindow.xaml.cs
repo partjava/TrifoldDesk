@@ -14,11 +14,14 @@ public partial class MainWindow : Window
     private readonly ConfigManager _config;
     private readonly MainViewModel _viewModel = new();
     private readonly AppSettings _settings;
+    internal string SelectedGpuId => _settings.SelectedGpuId;
+    internal bool AnimationsAllowed => _settings.AnimationsEnabled;
     private readonly HandleWindow _handle;
     private readonly SystemMonitorService _monitor;
     private readonly DiskMonitorService _disks;
     private readonly SystemActionService _actions = new();
     private readonly TrayService _tray;
+    private readonly ReminderService _reminders;
     private readonly DispatcherTimer _idleTimer, _hoverTimer, _controlTimer;
     private bool _ready, _syncingControls, _audioMuted, _readingBrightness;
     private BrightnessState? _brightness;
@@ -33,13 +36,14 @@ public partial class MainWindow : Window
         InitializeComponent(); DataContext = _viewModel;
         Icon=System.Windows.Media.Imaging.BitmapFrame.Create(new Uri("pack://application:,,,/Assets/AppIcon.ico"));
         _config = new ConfigManager(App.DataDirectory);
+        try { ConfigTransaction.Recover(App.DataDirectory); } catch(Exception ex) { App.Log(ex); _loadWarning="配置事务恢复失败："+ex.Message; }
         var settings = _config.Load<AppSettings>("settings.json"); _settings = settings.Value;
         // Legacy panel preferences must not override permanent desktop behavior.
         _settings.AlwaysOnTop = false; _settings.AutoCollapse = false; _settings.HoverExpand = false; _settings.IsCollapsed = false;
         if(!App.IsSelfTest)_settings.StartWithWindows=SystemActionService.AutoStartRegistered();
         _settings.GlassOpacity = Math.Clamp(_settings.GlassOpacity, .05, .55);
         var shortcuts = _config.Load<ShortcutConfig>("shortcuts.json");
-        _loadWarning = string.Join("\n", new[] { settings.Warning, shortcuts.Warning }.Where(w => w != null));
+        _loadWarning = string.Join("\n", new[] { _loadWarning, settings.Warning, shortcuts.Warning }.Where(w => w != null));
         foreach (var item in (shortcuts.Value.Items ?? []).Where(i => i != null && i.ScreenIndex is 0 or 1).OrderBy(i => i.Order))
         { try { Collection(item.ScreenIndex).Add(new ShortcutViewModel(item)); } catch (Exception ex) { App.Log(ex); _loadWarning += "\n部分入口加载失败，请检查日志。"; } }
         _viewModel.RebuildLibrary();
@@ -58,12 +62,14 @@ public partial class MainWindow : Window
         _controlTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
         _controlTimer.Tick += (_, _) => { RefreshAudio(); _viewModel.RefreshClock(); };
         _tray = new TrayService(() => Dispatcher.Invoke(Reveal), () => Dispatcher.Invoke(OpenSettings), () => Dispatcher.Invoke(Exit));
+        _reminders=new ReminderService(_config,occurrence=>_tray.Notify("日程提醒",occurrence.Event.Title+" · "+occurrence.StartLocal.ToString("MM月dd日 HH:mm")),message=>_loadWarning+="\n"+message,!App.IsSelfTest);
         Topmost = _settings.AlwaysOnTop; ApplyGlass(false); _ready = true; InitializePlugins(); InitializePaneMenus(); HubTabs.SelectedIndex = 3;
         Loaded += (_, _) =>
         {
             _handle.Show(); Dock(); SetCollapsed(_settings.IsCollapsed, false);
             if(!_settings.AlwaysOnTop) { WindowDockService.KeepAtDesktop(this);WindowDockService.KeepAtDesktop(_handle); }
             if (!string.IsNullOrWhiteSpace(_loadWarning)) { MessageBox.Show(this, _loadWarning, "配置恢复提示"); _viewModel.Status = "配置读取异常，原文件已保留。"; }
+            ApplyDesktopHost();
             _leftAt = DateTime.UtcNow; _idleTimer.Start();
         };
         SystemEvents.DisplaySettingsChanged += DisplayChanged;
@@ -75,7 +81,8 @@ public partial class MainWindow : Window
     }
     private IntPtr WindowMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if(msg==0x0046&&!_settings.AlwaysOnTop)WindowDockService.ProtectDesktopOrder(lParam);
+        if((uint)msg==ExplorerRestartMessage && _settings.DesktopEmbedded)Dispatcher.BeginInvoke(ApplyDesktopHost);
+        if(msg==0x0046&&!_settings.AlwaysOnTop&&_desktopHost?.IsAttached!=true)WindowDockService.ProtectDesktopOrder(lParam);
         if (msg is 0x02E0 or 0x007E or 0x001A) Dispatcher.BeginInvoke(() => { if (!_closing && !_docking) Dock(); });
         return IntPtr.Zero;
     }
@@ -83,7 +90,7 @@ public partial class MainWindow : Window
     private void Dock()
     {
         if (_docking) return; _docking = true;
-        try { WindowDockService.Dock(this, _handle, _settings.MonitorDevice); }
+        try { SwitchMonitorLayout(WindowDockService.SelectedScreen(_settings.MonitorDevice).DeviceName); WindowDockService.Dock(this, _handle, _settings.MonitorDevice); }
         finally { _docking = false; }
     }
     private ObservableCollection<ShortcutViewModel> Collection(int screen) => screen == 0 ? _viewModel.Apps : _viewModel.Projects;
@@ -223,8 +230,10 @@ public partial class MainWindow : Window
         if (_dialogOpen) return; Reveal(); _dialogOpen = true;
         try
         {
-            var window = new SettingsWindow(_settings) { Owner = this };
-            if (window.ShowDialog() == true)
+            var window = new SettingsWindow(_settings) { Owner = this, DiagnosticsReport=BuildDiagnosticsReport() };
+            var settingsAccepted=window.ShowDialog();
+            if(window.ProfileImported) { ReloadImportedProfile(); return; }
+            if (settingsAccepted == true)
             {
                 var updated = window.Result;
                 if (!App.IsSelfTest)
@@ -234,6 +243,8 @@ public partial class MainWindow : Window
                 }
                 _settings.GlassOpacity = updated.GlassOpacity; _settings.HoverExpand = updated.HoverExpand; _settings.AutoCollapse = updated.AutoCollapse;
                 _settings.AlwaysOnTop = updated.AlwaysOnTop; _settings.AnimationsEnabled = updated.AnimationsEnabled; _settings.TransparentIdle = updated.TransparentIdle;
+                _settings.DesktopEmbedded=updated.DesktopEmbedded;ApplyDesktopHost();
+                _settings.SelectedGpuId=updated.SelectedGpuId; _settings.SensorEnabled=updated.SensorEnabled;
                 _settings.StartWithWindows = updated.StartWithWindows; _settings.MonitorDevice = updated.MonitorDevice; _settings.NetworkInterfaceId = updated.NetworkInterfaceId;
                 Topmost = _handle.Topmost = _settings.AlwaysOnTop; _monitor.SelectedNetworkId = _settings.NetworkInterfaceId;
                 if(!_settings.AlwaysOnTop){WindowDockService.KeepAtDesktop(this);WindowDockService.KeepAtDesktop(_handle);}
@@ -309,6 +320,8 @@ public partial class MainWindow : Window
         _idleTimer.Stop(); _hoverTimer.Stop(); _controlTimer.Stop(); _monitor.Dispose(); _disks.Dispose();
         SystemEvents.DisplaySettingsChanged -= DisplayChanged;
         try { _actions.Dispose(); } catch (Exception ex) { App.Log(ex); }
+        DesktopHostService.Detach(this);
+        _reminders.Dispose();
         _tray.Dispose(); _handle.Close(); Close(); Application.Current.Shutdown();
     }
     private void WindowClosing(object? sender, CancelEventArgs e) { if (!_closing) { e.Cancel = true; SetCollapsed(true); } }

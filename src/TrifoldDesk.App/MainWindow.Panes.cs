@@ -17,7 +17,7 @@ public partial class MainWindow
         var menu = new ContextMenu(); ContextMenu = menu;
         menu.Opened += (_,_) => _menuOpen = true;
         menu.Closed += (_,_) => _menuOpen = false;
-        foreach (var (label,action) in new (string,Action)[] { ("插件库",()=>PluginLibraryClick(this,new RoutedEventArgs())), ("入口管理",()=>OpenManagementClick(this,new RoutedEventArgs())), ("个性化",()=>OpenAppearanceClick(this,new RoutedEventArgs())), ("设置",()=>OpenSettings()), ("全部收起",()=>SetCollapsed(true)) })
+        foreach (var (label,action) in new (string,Action)[] { ("插件库",()=>PluginLibraryClick(this,new RoutedEventArgs())), ("入口管理",()=>OpenManagementClick(this,new RoutedEventArgs())), ("设置",()=>OpenSettings()), ("全部收起",()=>SetCollapsed(true)) })
         { var entry=new MenuItem { Header=label }; entry.Click+=(_,_)=>action(); menu.Items.Add(entry); }
         menu.Items.Add(new Separator());
         for (int n=0;n<3;n++)
@@ -48,11 +48,11 @@ public partial class MainWindow
         var oldClip=PanelRoot.Clip; PanelRoot.Clip=null;
         var snapshot=new RenderTargetBitmap(width,height,96,96,PixelFormats.Pbgra32); snapshot.Render(PanelRoot); snapshot.Freeze(); PanelRoot.Clip=oldClip;
         int left=width*index/3,right=width*(index+1)/3;
-        var image=new Image { Source=new CroppedBitmap(snapshot,new Int32Rect(left,0,right-left,height)),Width=right-left,Height=height,RenderTransformOrigin=new Point(1,.5) };
-        var scale=new ScaleTransform(); var skew=new SkewTransform(); image.RenderTransform=new TransformGroup { Children=new TransformCollection { scale,skew } }; Canvas.SetLeft(image,left); _paneLayer.Children.Add(image);
-        _paneState=next; _paneBusy[index]=true; UpdatePaneClip();
-        Animate(scale,ScaleTransform.ScaleXProperty,folded?1:.02,folded?.02:1,TimeSpan.Zero);
-        Animate(skew,SkewTransform.AngleYProperty,folded?0:10,folded?10:0,TimeSpan.Zero);
+        var projection=FoldingVisual.Create(new CroppedBitmap(snapshot,new Int32Rect(left,0,right-left,height)),index%2==0);
+        var image=projection.Viewport;Canvas.SetLeft(image,left);_paneLayer.Children.Add(image);
+        _paneState=next;_paneBusy[index]=true;UpdatePaneClip();
+        var degrees=new DoubleAnimation(folded?0:85,folded?85:0,TimeSpan.FromMilliseconds(160)){EasingFunction=new CubicEase{EasingMode=EasingMode.EaseInOut}};
+        projection.Rotation.BeginAnimation(System.Windows.Media.Media3D.AxisAngleRotation3D.AngleProperty,degrees);
         var timer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(180) }; timer.Tick+=(_,_)=>{timer.Stop();_paneLayer.Children.Remove(image);_paneBusy[index]=false;UpdatePaneClip();}; timer.Start();
     }
     internal bool TestPaneFolded(int index)=>_paneState.Folded[index];

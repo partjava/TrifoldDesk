@@ -5,6 +5,7 @@ public sealed record PluginDefinition(string Id, string Name, string Description
 public sealed class WidgetInstance
 {
     public string InstanceId { get; set; } = Guid.NewGuid().ToString("N");
+    public string ExternalPluginId { get; set; } = "";
     public string PluginId { get; set; } = "";
     public int PaneIndex { get; set; } = 2;
     public string Style { get; set; } = "glass";
@@ -29,7 +30,7 @@ public sealed class DateCounter
 }
 public sealed class WidgetConfig
 {
-    public int SchemaVersion { get; set; } = 2;
+    public int SchemaVersion { get; set; } = 3;
     public List<WidgetInstance> Items { get; set; } = [];
 }
 public static class PluginRules
@@ -39,14 +40,19 @@ public static class PluginRules
         new("apps", "应用集合", "常用应用、分组与拖入添加。移除插件保留入口。", 0),
         new("projects", "项目资料", "项目、文件夹和文档快捷入口。", 1),
         new("calendar", "日历", "完整月历、农历、日期选择；可添加多个，放在任意一折。", 2, true),
-        new("folder", "应用文件夹", "把多个软件放进一个可展开的虚拟文件夹；拖动右下角调整图标显示数量。", 0, true),
-        new("clock", "桌面时钟", "大数字时间、日期与秒钟进度；可添加多个主题。", 2, true),
+        new("folder", "应用文件夹", "把多个软件放进一个可展开的虚拟文件夹；四角缩放，支持留空格排列。", 0, true),
+        new("clock", "桌面时钟", "数字时间、指针时钟、公历与农历。", 2, true),
         new("battery", "电池", "真实电量与供电状态；台式机明确显示没有电池。", 2),
         new("gpu", "GPU · 3D", "Windows GPU 3D引擎占用曲线；计数器不支持时明确提示。", 2),
         new("cpu", "CPU 状态", "实时 CPU 总占用。与其他状态插件共享采样。", 2),
         new("memory", "内存状态", "物理内存占用与已用容量。", 2),
         new("network", "网络速率", "所选网卡的即时上传与下载。", 2),
         new("disks", "全部磁盘", "所有逻辑卷的容量、可用空间与打开入口。", 2),
+        new("workbench", "工作台", "便签与待办；右键切换、归档和恢复。", 1, true),
+        new("weather", "天气", "选择城市后显示实际天气，离线保留缓存。", 2, true),
+        new("music", "音乐", "系统媒体会话的歌曲、封面与播放控制。", 2, true),
+        new("project-browser", "项目浏览", "按需展开文件树与只读Git状态。", 1, true),
+        new("external-plugin", "第三方插件", "独立进程的数据组件，需用户允许启动。", 1, true),
         new("controls", "快捷控制", "音量、亮度、常亮与 Windows 设置入口。", 2)
     ];
     public static bool CanAdd(WidgetConfig config, string id, int pane)
@@ -71,7 +77,7 @@ public static class PluginRules
     {
         var clean = new WidgetConfig();
         foreach (var item in Clone(source).Items ?? [])
-            if (item != null && CanAdd(clean, item.PluginId, item.PaneIndex) && !clean.Items.Any(w => w.InstanceId == item.InstanceId))
+            if (item != null && item.PaneIndex is >= 0 and <= 2 && Catalog.Any(p => p.Id == item.PluginId && (p.Multiple || !clean.Items.Any(w => w.PluginId == p.Id))) && !clean.Items.Any(w => w.InstanceId == item.InstanceId))
             { if (string.IsNullOrWhiteSpace(item.InstanceId)) item.InstanceId = Guid.NewGuid().ToString("N"); if (item.PluginId == "system-summary") item.Modules = SummaryRules.Modules(item).ToList(); clean.Items.Add(item); }
         return clean;
     }

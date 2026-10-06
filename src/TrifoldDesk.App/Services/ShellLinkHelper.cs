@@ -9,6 +9,26 @@ namespace TrifoldDesk.Services;
 public static class ShellLinkHelper
 {
     private static readonly Dictionary<string, ImageSource?> IconCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly object IconCacheLock = new();
+    internal static int TestCacheCount { get { lock (IconCacheLock) return IconCache.Count; } }
+    internal static void TestClearIconCache() { lock (IconCacheLock) IconCache.Clear(); }
+    private static double CurrentDpi()
+    {
+        var app = Application.Current;
+        return app != null && app.Dispatcher.CheckAccess() && app.MainWindow is Window window
+            ? VisualTreeHelper.GetDpi(window).DpiScaleX : 1;
+    }
+    private static int PixelSize(double dpiScale, int logicalSize) => (int)Math.Clamp(Math.Ceiling(Math.Clamp(logicalSize, 16, 256) * (double.IsFinite(dpiScale) && dpiScale > 0 ? Math.Clamp(dpiScale, .5, 8) : 1)), 16, 512);
+    private static long Modified(string? path)
+    {
+        try { return File.GetLastWriteTimeUtc(Environment.ExpandEnvironmentVariables(path ?? "")).Ticks; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return 0; }
+    }
+    private static void Cache(string key, ImageSource? image)
+    {
+        if (!IconCache.ContainsKey(key) && IconCache.Count >= 512) IconCache.Remove(IconCache.Keys.First());
+        IconCache[key] = image;
+    }
     public static ShortcutItem CreateShortcut(string source, int screen, int order)
     {
         source = Path.GetFullPath(source);
@@ -44,7 +64,10 @@ public static class ShellLinkHelper
     {
         if (!SourceExists(item)) throw new FileNotFoundException("入口已失效，请右键重新定位。", item.SourcePath);
         // Shell owns link arguments, working directory, elevation and special targets.
-        Process.Start(new ProcessStartInfo { FileName = item.SourcePath, UseShellExecute = true });
+        var plan = ScriptLaunchRules.Create(item);
+        var start = new ProcessStartInfo { FileName = plan.FileName, UseShellExecute = plan.UseShellExecute, WorkingDirectory = plan.WorkingDirectory };
+        foreach (string argument in plan.ArgumentList) start.ArgumentList.Add(argument);
+        Process.Start(start);
     }
     public static void ShowInFolder(ShortcutItem item)
     {
@@ -52,10 +75,19 @@ public static class ShellLinkHelper
         if (Directory.Exists(item.SourcePath)) Process.Start(new ProcessStartInfo(item.SourcePath) { UseShellExecute = true });
         else Process.Start(new ProcessStartInfo("explorer.exe") { Arguments = "/select,\"" + item.SourcePath + "\"", UseShellExecute = true });
     }
-    public static ImageSource? GetIcon(ShortcutItem item)
+    public static ImageSource? GetIcon(ShortcutItem item) => GetIcon(item, CurrentDpi());
+    public static ImageSource? GetIcon(ShortcutItem item, double dpiScale = 1, int logicalSize = 40)
     {
-        string key = item.SourcePath + "|" + item.IconPath + "|" + item.IconIndex;
-        if (IconCache.TryGetValue(key, out var cached)) return cached;
+        int pixels = PixelSize(dpiScale, logicalSize);
+        string key = item.SourcePath + "|" + item.TargetPath + "|" + item.IconPath + "|" + item.IconIndex + "|" + Modified(item.SourcePath) + "|" + Modified(item.TargetPath) + "|" + Modified(item.IconPath) + "|" + dpiScale.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "|" + logicalSize + "|" + pixels;
+        lock (IconCacheLock)
+        {
+            if (IconCache.TryGetValue(key, out var cached)) return cached;
+            var image = LoadIcon(item, pixels); Cache(key, image); return image;
+        }
+    }
+    private static ImageSource? LoadIcon(ShortcutItem item, int pixels)
+    {
         var info = new SHFILEINFO();
         IntPtr result;
         if (Path.GetExtension(item.SourcePath).Equals(".lnk", StringComparison.OrdinalIgnoreCase))
@@ -68,7 +100,12 @@ public static class ShellLinkHelper
                 string iconPath = Environment.ExpandEnvironmentVariables(item.IconPath ?? "");
                 if (File.Exists(iconPath))
                 {
-                    ExtractIconEx(iconPath, item.IconIndex, out var large, out var small, 1);
+                    SHDefExtractIcon(iconPath, item.IconIndex, 0, out var large, out var small, (uint)pixels);
+                    if (large == IntPtr.Zero)
+                    {
+                        if (small != IntPtr.Zero) DestroyIcon(small);
+                        ExtractIconEx(iconPath, item.IconIndex, out large, out small, 1);
+                    }
                     info.hIcon = large;
                     if (small != IntPtr.Zero) DestroyIcon(small);
                     if (large != IntPtr.Zero) result = large;
@@ -78,7 +115,11 @@ public static class ShellLinkHelper
                     com = new ShellLink(); ((IPersistFile)com).Load(item.SourcePath, 0);
                     ((IShellLinkW)com).GetIDList(out pidl);
                     if (pidl != IntPtr.Zero)
+                    {
+                        var highResolution = ShellImage(pidl, pixels);
+                        if (highResolution != null) return highResolution;
                         result = SHGetFileInfoPidl(pidl, 0, ref info, (uint)Marshal.SizeOf<SHFILEINFO>(), 0x108);
+                    }
                 }
             }
             catch (COMException ex) { App.Log(ex); }
@@ -88,32 +129,66 @@ public static class ShellLinkHelper
                 if (com != null && Marshal.IsComObject(com)) Marshal.FinalReleaseComObject(com);
             }
         }
-        else result = SHGetFileInfo(item.SourcePath, 0, ref info, (uint)Marshal.SizeOf<SHFILEINFO>(), 0x100);
+        else
+        {
+            var highResolution = ShellImage(Environment.ExpandEnvironmentVariables(item.TargetPath is { Length: > 0 } ? item.TargetPath : item.SourcePath), pixels);
+            if (highResolution != null) return highResolution;
+            result = SHGetFileInfo(item.SourcePath, 0, ref info, (uint)Marshal.SizeOf<SHFILEINFO>(), 0x100);
+        }
         ImageSource? image = null;
         if (result != IntPtr.Zero && info.hIcon != IntPtr.Zero)
         {
             try { var bitmap = Imaging.CreateBitmapSourceFromHIcon(info.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions()); bitmap.Freeze(); image = bitmap; }
             finally { DestroyIcon(info.hIcon); }
         }
-        // Keep cache bounded even when paths are repeatedly replaced.
-        if (IconCache.Count >= 512) IconCache.Clear();
-        IconCache[key] = image; return image;
+        return image;
     }
     public static void InvalidateIcon(string path)
-    { foreach (var key in IconCache.Keys.Where(k => k.StartsWith(path + "|", StringComparison.OrdinalIgnoreCase)).ToArray()) IconCache.Remove(key); }
+    { lock (IconCacheLock) foreach (var key in IconCache.Keys.Where(k => k.StartsWith(path + "|", StringComparison.OrdinalIgnoreCase) || k.StartsWith("shell-app|" + path + "|", StringComparison.OrdinalIgnoreCase)).ToArray()) IconCache.Remove(key); }
     private static string ShellAppPath(string path)=>Path.IsPathFullyQualified(path)?path:"shell:AppsFolder\\"+path;
-    public static ImageSource? GetShellAppIcon(string path)
+    public static ImageSource? GetShellAppIcon(string path) => GetShellAppIcon(path, CurrentDpi());
+    public static ImageSource? GetShellAppIcon(string path, double dpiScale, int logicalSize = 40)
     {
-        string key="shell-app|"+path;if(IconCache.TryGetValue(key,out var image))return image;
-        IntPtr pidl=IntPtr.Zero;var info=new SHFILEINFO();
+        int pixels = PixelSize(dpiScale, logicalSize);
+        string key = "shell-app|" + path + "|" + Modified(path) + "|" + pixels;
+        lock (IconCacheLock)
+        {
+            if (IconCache.TryGetValue(key, out var cached)) return cached;
+            IntPtr pidl = IntPtr.Zero; var info = new SHFILEINFO(); ImageSource? image = null;
+            try
+            {
+                if (SHParseDisplayName(ShellAppPath(path), IntPtr.Zero, out pidl, 0, out _) != 0) return null;
+                image = ShellImage(pidl, pixels);
+                if (image == null)
+                {
+                    SHGetFileInfoPidl(pidl, 0, ref info, (uint)Marshal.SizeOf<SHFILEINFO>(), 0x108);
+                    if (info.hIcon != IntPtr.Zero) { var bitmap = Imaging.CreateBitmapSourceFromHIcon(info.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions()); bitmap.Freeze(); image = bitmap; }
+                }
+                Cache(key, image); return image;
+            }
+            finally { if (info.hIcon != IntPtr.Zero) DestroyIcon(info.hIcon); if (pidl != IntPtr.Zero) Marshal.FreeCoTaskMem(pidl); }
+        }
+    }
+    private static ImageSource? ShellImage(string path, int pixels)
+    {
+        IntPtr pidl = IntPtr.Zero;
+        try { return SHParseDisplayName(path, IntPtr.Zero, out pidl, 0, out _) == 0 ? ShellImage(pidl, pixels) : null; }
+        finally { if (pidl != IntPtr.Zero) Marshal.FreeCoTaskMem(pidl); }
+    }
+    private static ImageSource? ShellImage(IntPtr pidl, int pixels)
+    {
+        IShellItemImageFactory? factory = null; IntPtr bitmap = IntPtr.Zero;
         try
         {
-            if(SHParseDisplayName(ShellAppPath(path),IntPtr.Zero,out pidl,0,out _)!=0)return null;
-            SHGetFileInfoPidl(pidl,0,ref info,(uint)Marshal.SizeOf<SHFILEINFO>(),0x108);
-            if(info.hIcon!=IntPtr.Zero){var bitmap=Imaging.CreateBitmapSourceFromHIcon(info.hIcon,Int32Rect.Empty,BitmapSizeOptions.FromEmptyOptions());bitmap.Freeze();image=bitmap;}
-            if(IconCache.Count>=512)IconCache.Clear();IconCache[key]=image;return image;
+            var id = typeof(IShellItemImageFactory).GUID;
+            if (SHCreateItemFromIDList(pidl, ref id, out factory) != 0 || factory == null) return null;
+            // ICONONLY prevents thumbnails; BIGGERSIZEOK retains native high-resolution assets.
+            if (factory.GetImage(new NativeSize { Width = pixels, Height = pixels }, 0x5, out bitmap) != 0 || bitmap == IntPtr.Zero) return null;
+            var source = Imaging.CreateBitmapSourceFromHBitmap(bitmap, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            source.Freeze(); return source;
         }
-        finally {if(info.hIcon!=IntPtr.Zero)DestroyIcon(info.hIcon);if(pidl!=IntPtr.Zero)Marshal.FreeCoTaskMem(pidl);}
+        catch (COMException ex) { App.Log(ex); return null; }
+        finally { if (bitmap != IntPtr.Zero) DeleteObject(bitmap); if (factory != null && Marshal.IsComObject(factory)) Marshal.FinalReleaseComObject(factory); }
     }
     public static string SaveShellAppLink(InstalledApp app)
     {
@@ -130,6 +205,15 @@ public static class ShellLinkHelper
         }
         finally {if(com!=null&&Marshal.IsComObject(com))Marshal.FinalReleaseComObject(com);if(pidl!=IntPtr.Zero)Marshal.FreeCoTaskMem(pidl);}
     }
+    [StructLayout(LayoutKind.Sequential)] private struct NativeSize { public int Width, Height; }
+    [ComImport, InterfaceType(ComInterfaceType.InterfaceIsIUnknown), Guid("BCC18B79-BA16-442F-80C4-8A59C30C463B")]
+    private interface IShellItemImageFactory
+    {
+        [PreserveSig] int GetImage(NativeSize size, uint flags, out IntPtr bitmap);
+    }
+    [DllImport("shell32.dll")] private static extern int SHCreateItemFromIDList(IntPtr pidl, ref Guid interfaceId, [MarshalAs(UnmanagedType.Interface)] out IShellItemImageFactory factory);
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)] private static extern int SHDefExtractIcon(string file, int index, uint flags, out IntPtr large, out IntPtr small, uint size);
+    [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr bitmap);
     [DllImport("shell32.dll",CharSet=CharSet.Unicode)] private static extern int SHParseDisplayName(string name,IntPtr binding,out IntPtr pidl,uint attributes,out uint actualAttributes);
     [DllImport("shell32.dll",EntryPoint="SHGetFileInfoW")] private static extern IntPtr SHGetFileInfoPidl(IntPtr pidl,uint attributes,ref SHFILEINFO info,uint size,uint flags);
 

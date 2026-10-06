@@ -108,6 +108,18 @@ try
     Check(SummaryRules.Needs(summaryClean, "memory"), "standalone and summary share sampling requirements");
     store.Save("summary.json", summaryClean);
     Check(store.Load<WidgetConfig>("summary.json").Value.Items[0].Modules.SequenceEqual(new[] { "cpu", "gpu" }), "summary module choices persist");
+    Check(PluginRules.Normalize(new WidgetConfig { Items = Enumerable.Range(0, 30).Select(_ => new WidgetInstance { PluginId="folder" }).ToList() }).Items.Count == 30, "normalization preserves migrated layout above add limit");
+    ConfigTransactionTests.Run(Check);
+    FolderWorkspaceTests.Run(Check);
+    ScriptLaunchTests.Run(Check);
+    CalendarEventsTests.Run(Check);
+    PlacementTests.Run(Check);
+    HardwareSensorTests.Run(Check);
+    ExtraWidgetTests.Run(Check);
+    MonitorLayoutTests.Run(Check);
+    PluginProtocolTests.Run(Check);
+    ProfilePackageTests.Run(Check);
+    LegacyMigrationTests.Run(Check);
     Console.WriteLine($"{passed} checks passed.");
 }
 finally { Directory.Delete(root, true); }

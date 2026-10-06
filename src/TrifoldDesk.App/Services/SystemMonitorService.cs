@@ -10,7 +10,7 @@ public sealed class SystemMonitorService : IDisposable
 {
     private readonly DispatcherTimer _timer;
     private PerformanceCounter? _cpu;
-    private bool _cpuAttempted, _sampling, _disposed;
+    private bool _cpuAttempted, _sampling, _disposed, _collapsed;
     private string _lastNetworkId = "";
     private int _resetBaseline;
     private long _received, _sent, _timestamp;
@@ -23,7 +23,7 @@ public sealed class SystemMonitorService : IDisposable
     public event Action<MonitorSnapshot>? Updated;
     public SystemMonitorService(Dispatcher dispatcher)
     {
-        _timer = new DispatcherTimer(DispatcherPriority.Background, dispatcher) { Interval = TimeSpan.FromSeconds(1) };
+        _timer = new DispatcherTimer(DispatcherPriority.Background, dispatcher) { Interval = TimeSpan.FromSeconds(2) };
         _timer.Tick += Tick;
     }
     public bool IsEnabled => _timer.IsEnabled;
@@ -34,10 +34,11 @@ public sealed class SystemMonitorService : IDisposable
         else { _timer.Stop(); if (!_sampling) ReleaseCpu(); }
     }
     public void SetCollapsed(bool collapsed)
-    { _timer.Interval = TimeSpan.FromSeconds(collapsed ? 5 : 1); Interlocked.Exchange(ref _resetBaseline, 1); }
+    { _collapsed=collapsed; _timer.Interval = TimeSpan.FromSeconds(collapsed ? 5 : 2); Interlocked.Exchange(ref _resetBaseline, 1); }
     private async void Tick(object? sender, EventArgs e)
     {
         if (_sampling || _disposed || !IsEnabled) return;
+        _timer.Interval=TimeSpan.FromSeconds(_collapsed?5:RenderBudget.SavingPower?3:2);
         _sampling = true;
         string selected = SelectedNetworkId;
         bool cpuEnabled = CpuEnabled, memoryEnabled = MemoryEnabled, networkEnabled = NetworkEnabled;

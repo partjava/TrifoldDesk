@@ -29,6 +29,10 @@ public partial class MainWindow
         var folderLoad = _config.Load<FolderConfig>("folders.json"); _folders = folderLoad.Value;
         _folders.Items ??= []; foreach (var folder in _folders.Items) folder.Items ??= [];
         _folders.DesktopEntries ??= [];
+        if (loaded.Warning != null) _loadWarning += "\n" + loaded.Warning;
+        if (folderLoad.Warning != null) _loadWarning += "\n" + folderLoad.Warning;
+        InitializeMonitorLayouts();
+        MigrateLegacyWidgets();
         InitializeDesktopDrop();
         if (loaded.Warning != null) _loadWarning += "\n" + loaded.Warning;
         if (folderLoad.Warning != null) _loadWarning += "\n" + folderLoad.Warning;
@@ -42,7 +46,6 @@ public partial class MainWindow
         WidgetCanvas.SizeChanged += (_, _) => { if (!_widgetLayoutReady) return; if (_frames.Count == 0) ApplyPlugins(); else foreach (var frame in _frames.Values) frame.Constrain(false); };
         Loaded += (_, _) => Dispatcher.BeginInvoke(() => { UpdateLayout(); _widgetLayoutReady = true; ApplyPlugins(); });
     }
-    private void OpenAppearanceClick(object sender, RoutedEventArgs e) => OpenSettings();
     private void OpenManagementClick(object sender, RoutedEventArgs e)
     {
         if (_dialogOpen) return; _dialogOpen = true;
@@ -62,15 +65,25 @@ public partial class MainWindow
     }
     private bool SaveWidgetConfig(WidgetConfig value)
     {
-        try { var clean = PluginRules.Normalize(value); _config.Save("widgets.json", clean); _widgets = clean; ApplyPlugins(); return true; }
+        try { var clean = PluginRules.Normalize(value); PersistWidgetLayout(clean); _widgets = clean; ApplyPlugins(); return true; }
         catch (Exception ex) { Fail("插件配置未保存，桌面保持原布局", ex); return false; }
     }
     private bool SaveFrame(WidgetInstance frame)
     {
+        if(!_frames.TryGetValue(frame.InstanceId,out var live)||!ReferenceEquals(live.Model,frame))return false;
         try
         {
             var next = PluginRules.Clone(_widgets); int index = next.Items.FindIndex(i => i.InstanceId == frame.InstanceId); if (index < 0) return false;
-            next.Items[index] = PluginRules.Clone(new WidgetConfig { Items = [frame] }).Items[0]; _config.Save("widgets.json", next); _widgets = next; return true;
+            if(!App.IsSelfTest && _frames.TryGetValue(frame.InstanceId,out var moved))
+            {
+                double paneWidth=WidgetCanvas.ActualWidth/3,left=frame.PaneIndex*paneWidth;
+                var requested=new WidgetBounds(frame.X-left,frame.Y,moved.ActualWidth,moved.ActualHeight);
+                var occupied=_frames.Values.Where(f=>f.Model.InstanceId!=frame.InstanceId && f.Model.PaneIndex==frame.PaneIndex).Select(f=>new WidgetBounds(f.Model.X-left,f.Model.Y,f.ActualWidth,f.ActualHeight));
+                var free=WidgetPlacement.Avoid(requested,occupied,paneWidth,WidgetCanvas.ActualHeight);
+                if(free.HasValue){frame.X=free.Value.X+left;frame.Y=free.Value.Y;Canvas.SetLeft(moved,frame.X);Canvas.SetTop(moved,frame.Y);}
+                else{_viewModel.Status="当前页面没有足够空位，保留原位置。";return false;}
+            }
+            next.Items[index] = PluginRules.Clone(new WidgetConfig { Items = [frame] }).Items[0]; PersistWidgetLayout(next); _widgets = next; return true;
         }
         catch (Exception ex) { Fail("布局未保存", ex); return false; }
     }
@@ -80,6 +93,7 @@ public partial class MainWindow
         if (!_widgetLayoutReady || _buildingWidgets) return; _buildingWidgets = true;
         try
         {
+            ResetFolderWorkspaceViews();
             foreach (var element in _widgetContents.Values) Detach(element);
             WidgetCanvas.Children.Clear(); _frames.Clear(); _folderViews.Clear(); _calendars.Clear(); _dashboards.Clear();
             double w = WidgetCanvas.ActualWidth > 1 ? WidgetCanvas.ActualWidth : 1400, h = WidgetCanvas.ActualHeight > 1 ? WidgetCanvas.ActualHeight : 750, pane = w / 3;
@@ -91,16 +105,23 @@ public partial class MainWindow
                 else if (item.PluginId == "folder")
                 {
                     var folder = new FolderWidget(item.InstanceId, () => ReadFolder(item.InstanceId), paths => AddFolderPaths(item.InstanceId, paths), (source, index, copy) => TransferFolder(source, item.InstanceId, index, copy), entry => RemoveFolderEntry(item.InstanceId, entry), (entry, screen) => ExportFolderEntry(item.InstanceId, entry, screen), (source, copy) => ImportLibraryEntry(item.InstanceId, source, copy));
+                    WireFolderWorkspace(item, folder);
                     folder.DragActiveChanged+=active=> { _dragging=active;if(!active) { _leftAt=DateTime.UtcNow;EndFolderEdgeDrags(); } };
                     _folderViews[item.InstanceId] = folder; body = folder;
                 }
                 else if (item.PluginId is "cpu" or "memory" or "network" or "gpu" or "clock" or "battery") { var dashboard = new DashboardWidget(item.PluginId, item.Style, _viewModel); _dashboards[item.PluginId] = dashboard; body = dashboard; }
+                else if (item.PluginId == "external-plugin")body=new ExternalPluginWidget(item.ExternalPluginId,_config);
+                else if (item.PluginId == "workbench")body=new ProductivityWidget(item.InstanceId,_config);
+                else if (item.PluginId == "weather")body=new WeatherWidget(item.InstanceId,_config);
+                else if (item.PluginId == "music")body=new MusicWidget(item.InstanceId,_config);
+                else if (item.PluginId == "project-browser")body=new ProjectBrowserWidget(item.InstanceId,_config);
                 else if (item.PluginId == "system-summary") body = new CombinedStatusWidget(item, _viewModel);
                 else body = _widgetContents[item.PluginId];
                 body.Visibility = Visibility.Visible; body.DataContext = _viewModel;
                 if (item.X < 0 || item.Y < 0 || item.Width <= 0 || item.Height <= 0)
                 {
                     item.X = item.PaneIndex * pane + 8; item.Y = 8; item.Width = Math.Max(200, pane - 20); item.Height = Math.Max(120, h - 16);
+                    if(item.PluginId is "workbench" or "weather" or "music" or "project-browser"){item.Width=Math.Min(350,pane-20);item.Height=270;}
                     switch (item.PluginId)
                     {
                         case "calendar": item.Width = Math.Min(350, pane - 20); item.Height = 340; item.Y = 8 + calendarNumber++ * 40; if (HasPlugin("disks")) { item.Y = h - 116; item.IsCollapsed = true; } break;
@@ -122,11 +143,13 @@ public partial class MainWindow
                 if(body is ScrollViewer {Content: CalendarWidget dateCalendar})
                 {
                     var addDate=new MenuItem{Header="添加日期"};addDate.Click+=(_,_)=>dateCalendar.AddDateCounter();frame.ContextMenu!.Items.Add(addDate);
+                    var agenda=new MenuItem{Header="日程 / 周历…"};agenda.Click+=(_,_)=>new AgendaWindow(_config){Owner=this}.ShowDialog();frame.ContextMenu.Items.Add(agenda);
                     dateCalendar.ContextMenu=frame.ContextMenu;
                 }
                 if (item.PluginId is "apps" or "projects") AttachLibraryDrop(frame, item.PluginId == "apps" ? 0 : 1);
                 if (item.PluginId == "system-summary")
                 {
+                    var sensors=new MenuItem{Header="温度 / 风扇 / 显存…"};sensors.Click+=(_,_)=>new HardwareDetailsWindow{Owner=this}.ShowDialog();frame.ContextMenu.Items.Add(sensors);
                     var choices = new MenuItem { Header = "显示内容" }; frame.ContextMenu.Items.Insert(0, choices);
                     foreach (var module in SummaryRules.Available)
                     {
@@ -192,11 +215,7 @@ public partial class MainWindow
         try { var data = new DataObject(); data.SetData(FolderWidget.LibraryFormat, new LibraryDrag(view.Item.ScreenIndex, view.Item.Id)); DragDrop.DoDragDrop(button, data, DragDropEffects.Move | DragDropEffects.Copy); }
         finally { _dragging = false; _leftAt = DateTime.UtcNow; } e.Handled = true;
     }
-    private bool SaveFolders(FolderConfig next)
-    {
-        try { _config.Save("folders.json", next); _folders = next; foreach (var view in _folderViews.Values.ToArray()) view.Refresh(); RefreshDesktopIcons(); return true; }
-        catch (Exception ex) { Fail("文件夹内容未保存", ex); return false; }
-    }
+    private bool SaveFolders(FolderConfig next) => SaveFolderWorkspace(next, _widgets);
     private void AddFolderPaths(string id, string[] paths)
     {
         var next = FolderRules.Clone(_folders); var folder = next.Items.FirstOrDefault(f => f.Id == id);

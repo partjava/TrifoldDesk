@@ -1,5 +1,5 @@
 ﻿#ifndef AppVersion
-#define AppVersion "0.10.12"
+#define AppVersion "0.10.17"
 #endif
 [Setup]
 AppId={{8B5A7B77-C1D1-4BE8-BA51-168433E51F26}
@@ -12,7 +12,7 @@ DefaultGroupName=TrifoldDesk
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-MinVersion=10.0
+MinVersion=10.0.19041
 OutputDir=..\dist\installers
 OutputBaseFilename=TrifoldDesk-Setup-{#AppVersion}-win-x64
 SetupIconFile=..\src\TrifoldDesk.App\Assets\AppIcon.ico
@@ -49,12 +49,25 @@ begin
     SaveStringToFile(ExpandConstant('{app}\current-version.txt'), '{#AppVersion}', False);
 end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
-var ResultCode: Integer;
+var ResultCode, Index: Integer;
+    StoredVersion: AnsiString;
+    OldVersion, OldExe: String;
+    ValidVersion: Boolean;
 begin
   Result := '';
-  if FileExists(ExpandConstant('{app}\dist\v{#AppVersion}\TrifoldDesk.exe')) then
+  OldVersion := '{#AppVersion}';
+  if LoadStringFromFile(ExpandConstant('{app}\current-version.txt'), StoredVersion) then
   begin
-    Exec(ExpandConstant('{app}\dist\v{#AppVersion}\TrifoldDesk.exe'), '--shutdown', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    OldVersion := Trim(String(StoredVersion));
+    ValidVersion := (Length(OldVersion) > 0) and (Length(OldVersion) <= 30);
+    for Index := 1 to Length(OldVersion) do
+      if Pos(Copy(OldVersion, Index, 1), '0123456789.') = 0 then ValidVersion := False;
+    if not ValidVersion then OldVersion := '{#AppVersion}';
+  end;
+  OldExe := ExpandConstant('{app}\dist\v') + OldVersion + '\TrifoldDesk.exe';
+  if FileExists(OldExe) then
+  begin
+    Exec(OldExe, '--shutdown', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Sleep(1000);
   end;
 end;

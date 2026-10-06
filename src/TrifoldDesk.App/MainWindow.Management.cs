@@ -97,6 +97,7 @@ public partial class MainWindow
     }
     private void SystemSettingsClick(object sender, RoutedEventArgs e)
     {
+        if(sender is Button radio && radio.Tag is string uri && uri is "ms-settings:network-wifi" or "ms-settings:bluetooth"){new WirelessControlWindow{Owner=this}.ShowDialog();return;}
         try { DesktopControlService.OpenSettings((string)((Button)sender).Tag); _viewModel.Status = "已打开 Windows 系统设置。"; }
         catch (Exception ex) { Fail("无法打开系统设置", ex); }
     }
