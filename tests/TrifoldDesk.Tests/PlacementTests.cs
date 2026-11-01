@@ -8,5 +8,6 @@ public static class PlacementTests
   check(placed.HasValue && !WidgetPlacement.Overlaps(placed.Value,occupied[0]),"drag finds nearest non-overlapping position within pane");
   check(WidgetPlacement.Avoid(new WidgetBounds(0,0,100,100),occupied,100,100)==null,"full pane reports unavailable instead of moving outside boundary");
   var free=new WidgetBounds(160,80,60,60);check(WidgetPlacement.Avoid(free,occupied,300,300)==free,"placement preserves deliberate free position");
+  check(WidgetPlacement.Avoid(new WidgetBounds(double.NaN,0,60,60),occupied,300,300)==null&&WidgetPlacement.Avoid(new WidgetBounds(0,0,0,60),occupied,300,300)==null,"placement rejects NaN and non-positive bounds");
  }
 }

@@ -22,6 +22,10 @@ public sealed class AgendaWindow : Window
         _store = store;
         Title = "日程与周历"; Width = 780; Height = 650; MinWidth = 620; MinHeight = 500;
         WindowStartupLocation = WindowStartupLocation.CenterOwner; Background = Brushes.WhiteSmoke; Foreground = Brushes.Black;
+        var darkInk = new SolidColorBrush(Color.FromRgb(24, 34, 44));
+        var textStyle = new Style(typeof(TextBlock)); textStyle.Setters.Add(new Setter(TextBlock.ForegroundProperty, darkInk)); Resources[typeof(TextBlock)] = textStyle;
+        var checkStyle = new Style(typeof(CheckBox)); checkStyle.Setters.Add(new Setter(CheckBox.ForegroundProperty, darkInk)); checkStyle.Setters.Add(new Setter(CheckBox.MarginProperty, new Thickness(0, 9, 0, 9))); Resources[typeof(CheckBox)] = checkStyle;
+        var buttonStyle = new Style(typeof(System.Windows.Controls.Button)); buttonStyle.Setters.Add(new Setter(System.Windows.Controls.Button.ForegroundProperty, darkInk)); buttonStyle.Setters.Add(new Setter(System.Windows.Controls.Button.BackgroundProperty, new SolidColorBrush(Color.FromRgb(228, 234, 240)))); buttonStyle.Setters.Add(new Setter(System.Windows.Controls.Button.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(176, 188, 198)))); Resources[typeof(System.Windows.Controls.Button)] = buttonStyle;
         var tabs = new TabControl { Margin = new Thickness(16) };
         var root = new DockPanel(); Content = root; _status.Margin = new Thickness(16, 0, 16, 12);
         DockPanel.SetDock(_status, Dock.Bottom); root.Children.Add(_status); root.Children.Add(tabs);
@@ -82,6 +86,7 @@ public sealed class AgendaWindow : Window
             var config = Read(); int index = config.Items.FindIndex(e => e.Id == item.Id);
             if (index >= 0) config.Items[index] = item; else config.Items.Add(item);
             _store.Save("events.json", config); _editingId = item.Id; _status.Text = "日程已保存。"; Refresh();
+            _events.SelectedItem = _events.Items.OfType<CalendarEvent>().FirstOrDefault(e => e.Id == item.Id);
         });
     }
     private void DeleteSelected()

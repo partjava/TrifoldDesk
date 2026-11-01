@@ -77,7 +77,7 @@ public sealed class WeatherConfig
 public static class WeatherRules
 {
     public static bool ValidCity(WeatherCity? city) => city != null && !string.IsNullOrWhiteSpace(city.Name) && double.IsFinite(city.Latitude) && city.Latitude is >= -90 and <= 90 && double.IsFinite(city.Longitude) && city.Longitude is >= -180 and <= 180;
-    public static bool NeedsRefresh(WeatherData state, DateTime nowUtc) => ValidCity(state.City) && (state.LastAttemptUtc == default || nowUtc - state.LastAttemptUtc >= TimeSpan.FromMinutes(30));
+    public static bool NeedsRefresh(WeatherData state, DateTime nowUtc) => ValidCity(state.City) && (state.LastAttemptUtc == default || state.LastAttemptUtc > nowUtc || nowUtc - state.LastAttemptUtc >= TimeSpan.FromMinutes(30));
     public static WeatherData SelectCity(WeatherData state, WeatherCity city)
     {
         if (!ValidCity(city)) throw new ArgumentException("城市坐标无效。");

@@ -87,7 +87,11 @@ try
     Check(FolderRules.Positions(store.Load<FolderConfig>("slots.json").Value.Items[0])[alpha.Id]==2,"empty slots survive reload");
     var slotCopy=FolderRules.Place(folders,"a","b",alpha.Id,3,true);
     Check(slotCopy.Items[0].Items[0].Id==alpha.Id && slotCopy.Items[1].Items.Last().Id!=alpha.Id,"slot copy retains source identity and assigns independent destination entry");
-    Check(copiedFolders.Items[0].Items.Count == 1 && copiedFolders.Items[1].Items.Count == 2, "control drag copies without removing source");
+    Check(copiedFolders.Items[0].Items.Count == 1 && copiedFolders.Items[1].Items.Count == 2 && copiedFolders.Items[0].Items[0].Id == alpha.Id && copiedFolders.Items[1].Items[0].Id != alpha.Id && !ReferenceEquals(copiedFolders.Items[0].Items[0], copiedFolders.Items[1].Items[0]), "control drag copies without removing source or sharing item reference");
+    var nestedLinks = new FolderConfig { Items = [new FolderData { Id = "a", Items = [new ShortcutItem { Id = "link1", ChildFolderId = "child1" }], Slots = new() { ["link1"] = 4 } }, new FolderData { Id = "b", Items = [new ShortcutItem { Id = "link2", ChildFolderId = "child2" }] }] };
+    var movedNestedLink = FolderRules.Transfer(nestedLinks, "a", "b", "link1", 0, true);
+    Check(movedNestedLink.Items[0].Items.Count == 0 && !movedNestedLink.Items[0].Slots.ContainsKey("link1") && movedNestedLink.Items[1].Items.Count == 2, "transferring a nested folder link with empty SourcePath moves without duplicating parent or blocked by another empty SourcePath");
+    Check(LibraryRules.Matches(alpha, null!, "开发"), "library search safely handles null query");
     var duplicates = new FolderConfig { Items = [new FolderData { Id = "a", Items = [alpha] }, new FolderData { Id = "b", Items = [alpha] }] };
     Check(FolderRules.Transfer(duplicates, "a", "b", alpha.Id, 0, false).Items[0].Items.Count == 1, "duplicate destination does not lose original membership");
     var emptyDestination = FolderRules.Transfer(folders, "a", "new-folder", alpha.Id, 0, false);

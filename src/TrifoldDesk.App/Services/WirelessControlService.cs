@@ -102,7 +102,7 @@ public sealed class WirelessControlService : IDisposable
         try
         {
             // This method is called only by the window's explicit toggle button, on its UI context.
-            _access ??= await Radio.RequestAccessAsync();
+            if (_access != RadioAccessStatus.Allowed) _access = await Radio.RequestAccessAsync();
             if (_access != RadioAccessStatus.Allowed) return new(false, "系统拒绝无线电控制权限：" + _access, radio.State.ToString());
             var confirmed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             void Confirm(Radio sender, object args) { if (sender.State == target) confirmed.TrySetResult(true); }

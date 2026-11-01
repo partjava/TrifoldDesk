@@ -30,17 +30,26 @@ public partial class MainWindow
         _folderWorkspaceHistory=null;
         var settings=_config.Load<AppSettings>("settings.json");
         foreach(var property in typeof(AppSettings).GetProperties().Where(p=>p.CanWrite))property.SetValue(_settings,property.GetValue(settings.Value));
-        _settings.AlwaysOnTop=false;_settings.AutoCollapse=false;_settings.HoverExpand=false;
+        _settings.AlwaysOnTop=false;_settings.AutoCollapse=false;_settings.HoverExpand=false;_settings.IsCollapsed=false;
+        _settings.GlassOpacity=Math.Clamp(_settings.GlassOpacity,.05,.55);
         if(!App.IsSelfTest)_settings.StartWithWindows=SystemActionService.AutoStartRegistered();
         var shortcuts=_config.Load<ShortcutConfig>("shortcuts.json");_viewModel.Apps.Clear();_viewModel.Projects.Clear();
-        foreach(var item in shortcuts.Value.Items.Where(i=>i.ScreenIndex is 0 or 1).OrderBy(i=>i.Order))Collection(item.ScreenIndex).Add(new ShortcutViewModel(item));
+        var shortcutItems=(shortcuts.Value?.Items??[]).Where(i=>i!=null).ToList();
+        foreach(var item in shortcutItems.Where(i=>i.ScreenIndex is 0 or 1).OrderBy(i=>i.Order))
+        {
+            try{Collection(item.ScreenIndex).Add(new ShortcutViewModel(item));}
+            catch(Exception ex){App.Log(ex);}
+        }
         _viewModel.RebuildLibrary();var widgets=_config.Load<WidgetConfig>("widgets.json");var folders=_config.Load<FolderConfig>("folders.json");
-        _widgets=PluginRules.Normalize(widgets.Value);_folders=folders.Value;
+        _widgets=PluginRules.Normalize(widgets.Value);_folders=folders.Value??new FolderConfig();
+        _folders.Items??=[];foreach(var folder in _folders.Items){folder.Items??=[];folder.Slots??=new();}
+        _folders.DesktopEntries??=[];
         _loadWarning=string.Join("\n",new[]{settings.Warning,shortcuts.Warning,widgets.Warning,folders.Warning}.Where(w=>w!=null));
         _paneState=_config.Load<PaneState>("panes.json").Value;if(_paneState.Folded?.Length!=3)_paneState.Folded=new bool[3];
         InitializeMonitorLayouts();MigrateLegacyWidgets();_monitor.SelectedNetworkId=_settings.NetworkInterfaceId;
-        Topmost=_handle.Topmost=false;ApplyGlass(false);Dock();ApplyPlugins();UpdatePaneClip();ApplyDesktopHost();
-        _viewModel.Status="配置已恢复，旧配置备份保留。";
+        if(_collapsed)SetCollapsed(false,false);
+        Topmost=_handle.Topmost=false;ApplyGlass(false,true);Dock();ApplyPlugins();UpdatePaneClip();ApplyDesktopHost();
+        _viewModel.Status=string.IsNullOrWhiteSpace(_loadWarning)?"配置已恢复，旧配置备份保留。":"配置已恢复（含读取提示），旧配置备份保留。";
     }
 }
 

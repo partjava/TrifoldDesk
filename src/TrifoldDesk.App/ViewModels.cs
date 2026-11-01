@@ -22,17 +22,25 @@ public sealed class ShortcutViewModel : Observable
     public string Tooltip => Item.Name + "\n" + Item.SourcePath + (IsMissing ? "\n已失效，请右键重新定位" : "");
     public bool IsMissing => !ShellLinkHelper.IsAvailable(Item);
     public ImageSource? Icon { get; private set; }
+    private string? _lastGroup;
     public void Refresh()
     {
         if (File.Exists(Item.SourcePath) && Path.GetExtension(Item.SourcePath).Equals(".lnk", StringComparison.OrdinalIgnoreCase))
         {
-            var current = ShellLinkHelper.CreateShortcut(Item.SourcePath, Item.ScreenIndex, Item.Order);
-            if (Item.TargetPath != current.TargetPath || Item.IconPath != current.IconPath || Item.IconIndex != current.IconIndex) ShellLinkHelper.InvalidateIcon(Item.SourcePath);
-            Item.TargetPath = current.TargetPath;
-            if(Item.LaunchMode=="shell"){Item.Arguments = current.Arguments; Item.WorkingDirectory = current.WorkingDirectory;}
-            Item.IconPath = current.IconPath; Item.IconIndex = current.IconIndex;
+            try
+            {
+                var current = ShellLinkHelper.CreateShortcut(Item.SourcePath, Item.ScreenIndex, Item.Order);
+                if (Item.TargetPath != current.TargetPath || Item.IconPath != current.IconPath || Item.IconIndex != current.IconIndex) ShellLinkHelper.InvalidateIcon(Item.SourcePath);
+                Item.TargetPath = current.TargetPath;
+                if(Item.LaunchMode=="shell"){Item.Arguments = current.Arguments; Item.WorkingDirectory = current.WorkingDirectory;}
+                Item.IconPath = current.IconPath; Item.IconIndex = current.IconIndex;
+            }
+            catch (Exception ex) { App.Log(ex); }
         }
-        Icon = ShellLinkHelper.GetIcon(Item); Changed(nameof(Icon)); Changed(nameof(Name)); Changed(nameof(Tooltip)); Changed(nameof(IsMissing)); Changed(nameof(Group)); Changed(nameof(ScreenName));
+        Icon = ShellLinkHelper.GetIcon(Item); Changed(nameof(Icon)); Changed(nameof(Name)); Changed(nameof(Tooltip)); Changed(nameof(IsMissing));
+        if (_lastGroup != null && _lastGroup != Group) Changed(nameof(Group));
+        _lastGroup = Group;
+        Changed(nameof(ScreenName));
     }
 }
 public sealed class MainViewModel : Observable

@@ -4,6 +4,7 @@ public sealed class PluginLibraryWindow : Window
 {
     public WidgetConfig Result { get; }
     private readonly StackPanel _instances = new();
+    private readonly StackPanel _installedExternal = new();
     private readonly WrapPanel _cards = new();
     private readonly Dictionary<string, (Button Add, ComboBox Pane, ComboBox Style)> _choices = [];
     private readonly Dictionary<string, FrameworkElement> _previews = [];
@@ -63,7 +64,9 @@ public sealed class PluginLibraryWindow : Window
             foreach (var card in _cards.Children.OfType<Border>()) card.Width = Math.Max(1, width / columns - 8);
         };
         body.Children.Add(new TextBlock { Text = "已添加", FontSize = 13, Foreground = PluginPreview.Fill("#B8C9D2"), Margin = new Thickness(0, 14, 0, 10) });
-        body.Children.Add(_instances); Refresh();
+        body.Children.Add(_instances);
+        body.Children.Add(_installedExternal);
+        Refresh();
     }
 
     private void InstallPlugin()
@@ -72,7 +75,16 @@ public sealed class PluginLibraryWindow : Window
         try
         {
             if(!PluginRules.CanAdd(Result,"external-plugin",1))throw new InvalidOperationException("组件数量已达上限。");
-            var manifest=PluginFiles.Install(picker.FolderName,App.DataDirectory);var widget=PluginRules.Add(Result,"external-plugin",1);widget.ExternalPluginId=manifest.Id;widget.Title=manifest.Name;widget.Width=320;widget.Height=200;Refresh();
+            string manifestPath=Path.Combine(picker.FolderName,"manifest.json");
+            PluginManifest manifest;
+            if(File.Exists(manifestPath)&&new FileInfo(manifestPath).Length<=65536&&System.Text.Json.JsonSerializer.Deserialize<PluginManifest>(File.ReadAllText(manifestPath),PluginProtocol.Json) is { } candidate&&PluginProtocol.ValidId(candidate.Id)&&Directory.Exists(Path.Combine(App.DataDirectory,"plugins",candidate.Id)))
+            {
+                string installedDir=Path.Combine(App.DataDirectory,"plugins",candidate.Id);
+                PluginProtocol.Validate(candidate,installedDir);
+                manifest=candidate;
+            }
+            else manifest=PluginFiles.Install(picker.FolderName,App.DataDirectory);
+            var widget=PluginRules.Add(Result,"external-plugin",1);widget.ExternalPluginId=manifest.Id;widget.Title=manifest.Name;widget.Width=320;widget.Height=200;Refresh();
         }
         catch(Exception ex){MessageBox.Show(this,ex.Message,"插件未添加");}
     }
@@ -84,8 +96,37 @@ public sealed class PluginLibraryWindow : Window
             var row = new DockPanel { Margin = new Thickness(0, 0, 8, 7) };
             var remove = new Button { Content = "移除", Padding = new Thickness(10, 5, 10, 5) }; DockPanel.SetDock(remove, Dock.Right); row.Children.Add(remove);
             string pane = item.PaneIndex is >= 0 and < 3 ? PaneNames[item.PaneIndex] : "未知位置";
-            row.Children.Add(new TextBlock { Text = $"{DisplayName(item.PluginId)}   ·   {pane}", FontSize = 13, Foreground = Brushes.WhiteSmoke, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+            string label = !string.IsNullOrWhiteSpace(item.Title) && item.Title != DisplayName(item.PluginId) ? $"{DisplayName(item.PluginId)}（{item.Title}）" : DisplayName(item.PluginId);
+            row.Children.Add(new TextBlock { Text = $"{label}   ·   {pane}", FontSize = 13, Foreground = Brushes.WhiteSmoke, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
             _instances.Children.Add(row); remove.Click += (_, _) => { Result.Items.Remove(item); Refresh(); };
+        }
+        _installedExternal.Children.Clear();
+        string pluginsDir = Path.Combine(App.DataDirectory, "plugins");
+        if (Directory.Exists(pluginsDir))
+        {
+            foreach (var dir in Directory.EnumerateDirectories(pluginsDir))
+            {
+                try
+                {
+                    string file = Path.Combine(dir, "manifest.json");
+                    if (!File.Exists(file) || new FileInfo(file).Length > 65536) continue;
+                    var manifest = System.Text.Json.JsonSerializer.Deserialize<PluginManifest>(File.ReadAllText(file), PluginProtocol.Json);
+                    if (manifest == null || manifest.Id != Path.GetFileName(dir)) continue;
+                    PluginProtocol.Validate(manifest, dir);
+                    if (Result.Items.Any(i => i.PluginId == "external-plugin" && i.ExternalPluginId == manifest.Id)) continue;
+                    var row = new DockPanel { Margin = new Thickness(0, 4, 8, 4) };
+                    var add = new Button { Content = "＋", ToolTip = "添加到桌面", Width = 30, Height = 30, Padding = new Thickness(0), FontSize = 17, IsEnabled = PluginRules.CanAdd(Result, "external-plugin", 1) };
+                    DockPanel.SetDock(add, Dock.Right); row.Children.Add(add);
+                    row.Children.Add(new TextBlock { Text = $"已安装扩展 · {manifest.Name} ({manifest.Id})", FontSize = 13, Foreground = PluginPreview.Fill("#B8C9D2"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+                    add.Click += (_, _) =>
+                    {
+                        if (!PluginRules.CanAdd(Result, "external-plugin", 1)) return;
+                        var widget = PluginRules.Add(Result, "external-plugin", 1); widget.ExternalPluginId = manifest.Id; widget.Title = manifest.Name; widget.Width = 320; widget.Height = 200; Refresh();
+                    };
+                    _installedExternal.Children.Add(row);
+                }
+                catch { }
+            }
         }
         RefreshAddButtons();
     }

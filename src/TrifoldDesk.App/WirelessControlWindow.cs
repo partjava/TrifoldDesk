@@ -7,6 +7,7 @@ public sealed class WirelessControlWindow : Window
     private readonly StackPanel _radios = new(), _devices = new();
     private readonly TextBlock _status = new() { Foreground = Brushes.LightGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 12) };
     private bool _closed, _refreshing, _refreshAgain;
+    private string? _lastActionMessage;
     public WirelessControlWindow()
     {
         Title = "无线设备与连接"; Width = 560; Height = 620; MinWidth = 440; MinHeight = 360;
@@ -15,7 +16,7 @@ public sealed class WirelessControlWindow : Window
         root.Children.Add(new TextBlock { Text = "Wi-Fi 与蓝牙", FontSize = 20, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 16) });
         root.Children.Add(_radios); root.Children.Add(_status);
         var refresh = new Button { Content = "刷新设备与连接", HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(12, 6, 12, 6) };
-        refresh.Click += async (_, _) => await RefreshAsync(); root.Children.Add(refresh);
+        refresh.Click += async (_, _) => { _lastActionMessage = null; await RefreshAsync(); }; root.Children.Add(refresh);
         root.Children.Add(new TextBlock { Text = "连接与已配对设备", FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 20, 0, 10) }); root.Children.Add(_devices);
         root.Children.Add(new TextBlock { Text = "飞行模式：此应用没有可靠的全局切换接口，请使用Windows设置。无线电关闭状态不会被当作飞行模式。", TextWrapping = TextWrapping.Wrap, Foreground = Brushes.LightGray, Margin = new Thickness(0, 20, 0, 10) });
         var settings = new WrapPanel(); SettingsButton(settings, "Wi-Fi设置", "ms-settings:network-wifi"); SettingsButton(settings, "蓝牙设置", "ms-settings:bluetooth"); SettingsButton(settings, "飞行模式设置", "ms-settings:network-airplanemode"); root.Children.Add(settings);
@@ -47,11 +48,12 @@ public sealed class WirelessControlWindow : Window
                     button.IsEnabled = false;
                     var result = await _service.SetRadioStateAsync(radio.Id, radio.State != "On");
                     if (_closed) return;
-                    await RefreshAsync(); _status.Text = result.Message + " · " + StateText(result.ActualState);
+                    _lastActionMessage = result.Message + " · " + StateText(result.ActualState);
+                    await RefreshAsync();
                 };
                 Grid.SetColumn(button, 1); row.Children.Add(button); _radios.Children.Add(row);
             }
-            _status.Text = string.Join("\n", snapshot.Warnings);
+            _status.Text = string.Join("\n", new[] { _lastActionMessage }.Concat(snapshot.Warnings).Where(s => !string.IsNullOrWhiteSpace(s)));
             _devices.Children.Clear();
             _devices.Children.Add(Label(snapshot.WifiConnections.Count == 0 ? "当前没有可读取的Wi-Fi连接" : "Wi-Fi：" + string.Join("；", snapshot.WifiConnections)));
             foreach (var device in snapshot.BluetoothDevices)

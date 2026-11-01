@@ -34,6 +34,7 @@ public static class DesktopControlService
     public static string BatteryText()
     {
         var power = Forms.SystemInformation.PowerStatus;
+        if (power.BatteryChargeStatus == Forms.BatteryChargeStatus.Unknown) return "电源状态未知";
         if (power.BatteryChargeStatus.HasFlag(Forms.BatteryChargeStatus.NoSystemBattery)) return "交流供电 · 无电池";
         float level = power.BatteryLifePercent;
         string percentage = level is >= 0 and <= 1 ? $"{level * 100:0}%" : "未知";

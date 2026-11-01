@@ -7,8 +7,10 @@ public partial class MainWindow
     private void CollapseClick(object sender, RoutedEventArgs e) => SetCollapsed(true);
     private void SortChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_ready || sender is not ComboBox combo || combo.SelectedIndex == 0) return;
-        SortScreen(int.Parse((string)combo.Tag), combo.SelectedIndex == 2);
+        if (!_ready || sender is not ComboBox combo || combo.SelectedIndex <= 0) return;
+        bool descending = combo.SelectedIndex == 2;
+        combo.SelectedIndex = 0;
+        SortScreen(int.Parse((string)combo.Tag), descending);
     }
     private void SortScreen(int screen, bool descending)
     {
@@ -97,7 +99,7 @@ public partial class MainWindow
     }
     private void SystemSettingsClick(object sender, RoutedEventArgs e)
     {
-        if(sender is Button radio && radio.Tag is string uri && uri is "ms-settings:network-wifi" or "ms-settings:bluetooth"){new WirelessControlWindow{Owner=this}.ShowDialog();return;}
+        if(sender is Button radio && radio.Tag is string uri && uri is "ms-settings:network-wifi" or "ms-settings:bluetooth"){_dialogOpen=true;try{new WirelessControlWindow{Owner=this}.ShowDialog();}finally{_dialogOpen=false;_leftAt=DateTime.UtcNow;}return;}
         try { DesktopControlService.OpenSettings((string)((Button)sender).Tag); _viewModel.Status = "已打开 Windows 系统设置。"; }
         catch (Exception ex) { Fail("无法打开系统设置", ex); }
     }

@@ -33,7 +33,7 @@ public sealed class DiskMonitorService : IDisposable
             var work = drives.Select(async drive =>
             {
                 // Reuse a timed-out pending read so unreachable network drives cannot grow thread usage forever.
-                if (!_pending.TryGetValue(drive.Name, out var read)) _pending[drive.Name] = read = Task.Run(() => Read(drive));
+                if (!_pending.TryGetValue(drive.Name, out var read) || read.IsCompleted) _pending[drive.Name] = read = Task.Run(() => Read(drive));
                 var finished = await Task.WhenAny(read, Task.Delay(900));
                 if (finished == read) { _pending.Remove(drive.Name); return await read; }
                 return new DriveSnapshot(drive.Name, "", Kind(drive.DriveType), null, null, "暂时无法读取 / 设备离线");

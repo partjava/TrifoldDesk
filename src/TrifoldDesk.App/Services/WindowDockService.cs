@@ -52,6 +52,7 @@ public static class WindowDockService
     public static void ProtectDesktopOrder(IntPtr position)
     {
         if(position==IntPtr.Zero)return;
+        if(Application.Current?.MainWindow is Window main && main.OwnedWindows.Cast<Window>().Any(w=>w.IsVisible))return;
         var value=Marshal.PtrToStructure<WINDOWPOS>(position);
         if((value.Flags&4)!=0)return;
         value.After=new IntPtr(1);Marshal.StructureToPtr(value,position,false);

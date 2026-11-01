@@ -57,7 +57,7 @@ public sealed class StartupDiagnosticsWindow : Window
         Title="启动诊断";Width=650;Height=500;WindowStartupLocation=WindowStartupLocation.CenterOwner;Background=new SolidColorBrush(Color.FromRgb(22,36,48));
         var body=new DockPanel{Margin=new Thickness(20)};Content=body;
         var actions=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right,Margin=new Thickness(0,14,0,0)};DockPanel.SetDock(actions,Dock.Bottom);body.Children.Add(actions);
-        var copy=new Button{Content="复制诊断",Margin=new Thickness(0,0,10,0)};copy.Click+=(_,_)=>Clipboard.SetText(report);actions.Children.Add(copy);
+        var copy=new Button{Content="复制诊断",Margin=new Thickness(0,0,10,0)};copy.Click+=(_,_)=>{try{Clipboard.SetDataObject(report,false);copy.Content="已复制";}catch(Exception ex){App.Log(ex);MessageBox.Show(this,"剪贴板暂时被其他程序占用，请稍后重试。","复制诊断");}};actions.Children.Add(copy);
         var open=new Button{Content="打开配置目录"};open.Click+=(_,_)=>{if(Directory.Exists(directory))Process.Start(new ProcessStartInfo(directory){UseShellExecute=true});};actions.Children.Add(open);
         body.Children.Add(new TextBox{Text=report,IsReadOnly=true,TextWrapping=TextWrapping.Wrap,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,Background=Brushes.Transparent,Foreground=Brushes.White,BorderThickness=new Thickness(0)});
     }

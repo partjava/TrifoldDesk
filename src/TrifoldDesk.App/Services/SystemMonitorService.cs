@@ -30,11 +30,11 @@ public sealed class SystemMonitorService : IDisposable
     public void SetEnabled(bool enabled)
     {
         if (_disposed || enabled == IsEnabled) return;
-        if (enabled) { Interlocked.Exchange(ref _resetBaseline, 1); _timer.Start(); }
+        if (enabled) { Interlocked.Exchange(ref _resetBaseline, 1); _timer.Start(); Tick(this, EventArgs.Empty); }
         else { _timer.Stop(); if (!_sampling) ReleaseCpu(); }
     }
     public void SetCollapsed(bool collapsed)
-    { _collapsed=collapsed; _timer.Interval = TimeSpan.FromSeconds(collapsed ? 5 : 2); Interlocked.Exchange(ref _resetBaseline, 1); }
+    { _collapsed=collapsed; _timer.Interval = TimeSpan.FromSeconds(collapsed ? 5 : 2); }
     private async void Tick(object? sender, EventArgs e)
     {
         if (_sampling || _disposed || !IsEnabled) return;

@@ -192,7 +192,13 @@ public partial class MainWindow
         if(folder==null){folder=new FolderData{Id=id};next.Items.Add(folder);}
         folder.DirectoryPath=string.IsNullOrEmpty(path)?"":Path.GetFullPath(path);
         if(!SaveFolderWorkspace(next,_widgets))return false;
-        foreach(var state in _folderWorkspaceViews.Values.Where(s=>s.CurrentId==id).ToArray()){state.MappedPath=folder.DirectoryPath;state.Parents.Clear();RefreshFolderWorkspaceView(state);}
+        foreach(var state in _folderWorkspaceViews.Values.Where(s=>s.CurrentId==id).ToArray())
+        {
+            state.MappedPath=folder.DirectoryPath;
+            if(state.RootId==id)state.Parents.Clear();
+            else while(state.Parents.Count>0&&state.Parents.Peek().Id==id)state.Parents.Pop();
+            RefreshFolderWorkspaceView(state);
+        }
         return true;
     }
     private FolderConfig WorkspaceFolderConfig()

@@ -90,7 +90,7 @@ public partial class MainWindow : Window
     private void Dock()
     {
         if (_docking) return; _docking = true;
-        try { SwitchMonitorLayout(WindowDockService.SelectedScreen(_settings.MonitorDevice).DeviceName); WindowDockService.Dock(this, _handle, _settings.MonitorDevice); }
+        try { WindowDockService.Dock(this, _handle, _settings.MonitorDevice); UpdateLayout(); SwitchMonitorLayout(WindowDockService.SelectedScreen(_settings.MonitorDevice).DeviceName); }
         finally { _docking = false; }
     }
     private ObservableCollection<ShortcutViewModel> Collection(int screen) => screen == 0 ? _viewModel.Apps : _viewModel.Projects;
@@ -128,14 +128,15 @@ public partial class MainWindow : Window
     }
     private void AddClick(object sender, RoutedEventArgs e)
     {
+        bool picking = false;
         _dialogOpen = true;
         try
         {
             var menu = new ContextMenu();
             int screen = int.Parse((string)((Button)sender).Tag);
-            var file = new MenuItem { Header = "添加文件或快捷方式…" }; file.Click += (_, _) => ChooseFiles(screen);
-            var folder = new MenuItem { Header = "添加文件夹…" }; folder.Click += (_, _) => ChooseFolder(screen);
-            menu.Items.Add(file); menu.Items.Add(folder); menu.Closed += (_, _) => { _dialogOpen = false; _leftAt = DateTime.UtcNow; };
+            var file = new MenuItem { Header = "添加文件或快捷方式…" }; file.PreviewMouseDown += (_, _) => picking = true; file.Click += (_, _) => { picking = true; ChooseFiles(screen); };
+            var folder = new MenuItem { Header = "添加文件夹…" }; folder.PreviewMouseDown += (_, _) => picking = true; folder.Click += (_, _) => { picking = true; ChooseFolder(screen); };
+            menu.Items.Add(file); menu.Items.Add(folder); menu.Closed += (_, _) => { if (!picking) { _dialogOpen = false; _leftAt = DateTime.UtcNow; } };
             menu.PlacementTarget = (Button)sender; menu.IsOpen = true;
         }
         catch { _dialogOpen = false; throw; }
@@ -232,7 +233,7 @@ public partial class MainWindow : Window
         {
             var window = new SettingsWindow(_settings) { Owner = this, DiagnosticsReport=BuildDiagnosticsReport() };
             var settingsAccepted=window.ShowDialog();
-            if(window.ProfileImported) { ReloadImportedProfile(); return; }
+            if(window.ProfileImported) return;
             if (settingsAccepted == true)
             {
                 var updated = window.Result;
@@ -248,7 +249,7 @@ public partial class MainWindow : Window
                 _settings.StartWithWindows = updated.StartWithWindows; _settings.MonitorDevice = updated.MonitorDevice; _settings.NetworkInterfaceId = updated.NetworkInterfaceId;
                 Topmost = _handle.Topmost = _settings.AlwaysOnTop; _monitor.SelectedNetworkId = _settings.NetworkInterfaceId;
                 if(!_settings.AlwaysOnTop){WindowDockService.KeepAtDesktop(this);WindowDockService.KeepAtDesktop(_handle);}
-                ApplyGlass(false); Dock(); SaveSettings();
+                ApplyGlass(false, true); Dock(); SaveSettings();
             }
         }
         finally { _dialogOpen = false; _leftAt = DateTime.UtcNow; }
@@ -268,6 +269,8 @@ public partial class MainWindow : Window
         _collapsed = collapsed; _settings.IsCollapsed = collapsed; _handle.SetCollapsed(collapsed);
         _handle.Visibility = collapsed ? Visibility.Visible : Visibility.Hidden;
         _monitor.SetCollapsed(collapsed); _hoverTimer.Stop();
+        if (collapsed) { _idleTimer?.Stop(); _controlTimer?.Stop(); _paneLayer.Children.Clear(); }
+        else { _viewModel.RefreshClock(); if (HasPlugin("controls") || HubTabs.SelectedIndex == 2) { RefreshAudio(); _controlTimer?.Start(); } _idleTimer?.Start(); }
         int version = ++_animationVersion;
         double current = PanelTranslation.X;
         PanelTranslation.BeginAnimation(TranslateTransform.XProperty, null);
@@ -292,17 +295,33 @@ public partial class MainWindow : Window
         }
         _leftAt = DateTime.UtcNow; SaveSettings();
     }
-    private void ApplyGlass(bool idle)
+    private bool _idleGlassApplied;
+    private bool _glassInitialized;
+    private DateTime _lastShortcutRefreshUtc;
+    private void ApplyGlass(bool idle, bool force = false)
     {
+        if (_glassInitialized && !force && _idleGlassApplied == idle) return;
+        _glassInitialized = true;
+        _idleGlassApplied = idle;
         double alpha = _settings.GlassOpacity * (idle && _settings.TransparentIdle ? .45 : 1);
         // Only the background changes; foreground content remains readable.
-        Resources["GlassFill"] = new LinearGradientBrush(new GradientStopCollection
+        var brush = new LinearGradientBrush(new GradientStopCollection
         {
             new(Color.FromArgb((byte)(alpha * 255), 255, 255, 255), 0),
             new(Color.FromArgb((byte)(Math.Min(.52, alpha + .15) * 255), 15, 30, 43), 1)
         }, new Point(0, 0), new Point(1, 1));
+        brush.Freeze();
+        Resources["GlassFill"] = brush;
     }
-    private void PanelMouseEnter(object sender, MouseEventArgs e) { _idleTimer.Stop(); ApplyGlass(false); foreach (var item in _viewModel.Apps.Concat(_viewModel.Projects)) item.Refresh(); }
+    private void PanelMouseEnter(object sender, MouseEventArgs e)
+    {
+        _idleTimer.Stop(); ApplyGlass(false);
+        if ((DateTime.UtcNow - _lastShortcutRefreshUtc).TotalSeconds >= 15)
+        {
+            _lastShortcutRefreshUtc = DateTime.UtcNow;
+            foreach (var item in _viewModel.Apps.Concat(_viewModel.Projects)) item.Refresh();
+        }
+    }
     private void PanelMouseLeave(object sender, MouseEventArgs e) { _leftAt = DateTime.UtcNow; _idleTimer.Start(); }
     private void IdleTick(object? sender, EventArgs e)
     {

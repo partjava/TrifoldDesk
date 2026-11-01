@@ -45,6 +45,17 @@ public static class ConfigTransactionTests
             File.WriteAllText(Path.Combine(root,"config-transaction.pending.json"),JsonSerializer.Serialize(new {Version=1,StagingDirectory=staging,Files=new[]{new{Name="folders.json",Sha256="bad",Existed=true}}}));
             bool integrity=false;try {Recover(root);}catch(InvalidDataException){integrity=true;}
             check(integrity&&File.Exists(Path.Combine(root,"config-transaction.pending.json"))&&File.ReadAllText(Path.Combine(root,"folders.json"))==recovered,"recovery integrity failure keeps original config and journal intact");
+            File.Delete(Path.Combine(root,"config-transaction.pending.json"));
+            Directory.Delete(Path.Combine(root,staging),true);
+            Commit(root,new() {
+                ["settings.json"]=new AppSettings(),
+                ["shortcuts.json"]=new ShortcutConfig(),
+                ["widgets.json"]=new WidgetConfig(),
+                ["folders.json"]=new FolderConfig(),
+                ["PANES.JSON"]=new { Left=true },
+                ["monitors.json"]=new MonitorLayoutConfig()
+            });
+            check(File.Exists(Path.Combine(root,"monitors.json")), "transaction commits six allowed configuration files and case-insensitive panes.json");
         }
         finally {Directory.Delete(root,true);}
     }

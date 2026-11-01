@@ -70,7 +70,7 @@ public sealed class CalendarWidget : Border
         foreach(var item in _readDates())
         {
             int days=item.DaysFrom(_today);
-            var row=new Grid{Margin=new Thickness(0,8,0,2)};row.ColumnDefinitions.Add(new ColumnDefinition());row.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+            var row=new Grid{Margin=new Thickness(0,8,0,2),Background=Brushes.Transparent};row.ColumnDefinitions.Add(new ColumnDefinition());row.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
             row.Children.Add(new TextBlock{Text=item.Name,FontSize=12,Foreground=Fill(_paper?"#554D3E":"#D7DBE2"),VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new Thickness(0,0,8,0)});
             var count=new TextBlock{Text=days==0?"今天":(days>0?"还有 ":"已过 ")+Math.Abs(days)+" 天",FontSize=18,Foreground=Fill(_paper?"#393D38":"#F0F7FA"),VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(count,1);row.Children.Add(count);
             var button=new Button{Content=row,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(2),HorizontalContentAlignment=HorizontalAlignment.Stretch,ToolTip=item.Date.ToString("yyyy年M月d日")};button.Click+=(_,_)=>EditCounter(item);

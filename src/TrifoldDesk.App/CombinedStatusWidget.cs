@@ -15,7 +15,9 @@ public sealed class CombinedStatusWidget : ScrollViewer
                 var diskTile=new Grid { Margin=new Thickness(6,3,6,7) };
                 diskTile.RowDefinitions.Add(new(){Height=GridLength.Auto}); diskTile.RowDefinitions.Add(new());
                 diskTile.Children.Add(Header("disks","硬盘",instance.Style));
-                var entries=_diskEntries; Grid.SetRow(entries,1); diskTile.Children.Add(entries); entries.Margin=new Thickness(0,10,0,0);
+                var entries=_diskEntries; entries.Margin=new Thickness(0,10,0,0);
+                var diskScroll=new ScrollViewer { VerticalScrollBarVisibility=ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled, Content=entries };
+                Grid.SetRow(diskScroll,1); diskTile.Children.Add(diskScroll);
                 void RefreshDisks()
                 {
                     entries.Children.Clear();
@@ -24,7 +26,7 @@ public sealed class CombinedStatusWidget : ScrollViewer
                         entries.Children.Add(new TextBlock { Text=drive.Name.TrimEnd('\\')+"  "+(drive.FreeBytes is long free && drive.TotalBytes is long total?$"余 {free/1073741824d:0.#} / {total/1073741824d:0.#} GB":"不可用"),FontSize=10,Foreground=instance.Style=="paper"?Brushes.DarkSlateGray:Brushes.WhiteSmoke,Margin=new Thickness(0,0,0,4),TextTrimming=TextTrimming.CharacterEllipsis,ToolTip=drive.CapacityText+" · 进度条表示已用容量" });
                         entries.Children.Add(new ProgressBar { Value=drive.UsedPercent,Maximum=100,Height=5,Margin=new Thickness(0,0,0,10),Template=BarTemplate(),Foreground=drive.LowSpace?Brushes.OrangeRed:new LinearGradientBrush(Color.FromRgb(56,186,193),Color.FromRgb(116,225,209),0),Background=new SolidColorBrush(Color.FromArgb(40,190,200,205)) });
                     }
-                    if(entries.Children.Count==0)entries.Children.Add(new TextBlock { Text="磁盘读取中…",FontSize=10 });
+                    if(entries.Children.Count==0)entries.Children.Add(new TextBlock { Text=model.Drives.Count>0?"无固定本地磁盘":"磁盘读取中…",FontSize=10,Foreground=instance.Style=="paper"?Brushes.DarkSlateGray:Brushes.WhiteSmoke });
                 }
                 System.Collections.Specialized.NotifyCollectionChangedEventHandler changed=(_,_)=>RefreshDisks();
                 Loaded+=(_,_)=>{model.Drives.CollectionChanged+=changed;RefreshDisks();};
@@ -60,6 +62,6 @@ public sealed class CombinedStatusWidget : ScrollViewer
     {
         double width = Math.Max(1, ActualWidth - 18); int columns = width >= 200 ? 2 : 1;
         double rows=Math.Max(1,Math.Ceiling(_tiles.Children.Count/(double)columns));
-        foreach (var tile in _tiles.Children.OfType<Grid>()) { tile.Width = Math.Max(1, width / columns - 12); tile.Height = Math.Clamp(ActualHeight/rows-10,80,145); }
+        foreach (var tile in _tiles.Children.OfType<Grid>()) { tile.Width = Math.Max(1, width / columns - 12); tile.Height = Math.Clamp(ActualHeight/rows-10,80,180); }
     }
 }

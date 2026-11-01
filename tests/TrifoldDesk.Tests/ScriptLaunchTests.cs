@@ -25,6 +25,10 @@ public static class ScriptLaunchTests
             item.Arguments="";item.WorkingDirectory=Path.Combine(root,"missing");denied=false;try{ScriptLaunchRules.Create(item);}catch(IOException){denied=true;}check(denied,"missing working directory is rejected");
             item.WorkingDirectory=root;item.LaunchMode="unknown";denied=false;try{ScriptLaunchRules.Create(item);}catch(ArgumentException){denied=true;}check(denied,"unknown launch modes do not silently execute");
             item.LaunchMode="python";item.SourcePath=powershell;denied=false;try{ScriptLaunchRules.Create(item);}catch(ArgumentException){denied=true;}check(denied,"Python mode requires an explicit Python script source");
+            string pyDir=Path.Combine(root,"fake.py");Directory.CreateDirectory(pyDir);
+            item.SourcePath=pyDir;denied=false;try{ScriptLaunchRules.Create(item);}catch(ArgumentException){denied=true;}check(denied,"Python mode rejects a directory with .py extension");
+            var shellUriPlan=ScriptLaunchRules.Create(new ShortcutItem{SourcePath=@"shell:AppsFolder\Example",LaunchMode="shell"});
+            check(shellUriPlan.UseShellExecute&&shellUriPlan.FileName==@"shell:AppsFolder\Example","shell launch mode allows shell: URI targets");
         }
         finally{Directory.Delete(root,true);}
     }

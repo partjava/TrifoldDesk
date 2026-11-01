@@ -5,6 +5,7 @@ namespace TrifoldDesk;
 
 public sealed class ProductivityWidget : Grid, IProfileReplacementParticipant
 {
+    private static readonly HashSet<ProductivityWidget> ActiveInstances = [];
     private readonly string _instanceId;
     private readonly ConfigManager _store;
     private WorkbenchData _data = new();
@@ -19,14 +20,17 @@ public sealed class ProductivityWidget : Grid, IProfileReplacementParticipant
     public ProductivityWidget(string instanceId, ConfigManager store)
     {
         _instanceId = instanceId; _store = store;
+        foreach (var active in ActiveInstances.ToArray()) active.Flush();
+        ActiveInstances.Add(this);
         RowDefinitions.Add(new()); RowDefinitions.Add(new() { Height = GridLength.Auto });
         try { var loaded = store.Load<ProductivityConfig>("optional-workbench.json"); if (loaded.Value.Widgets?.TryGetValue(instanceId, out var saved) == true) _data = saved; _status.Text = loaded.Warning ?? "右键切换便签 / 待办"; }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { _status.Text = "读取失败：" + ex.Message; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or FutureSchemaException) { _status.Text = "读取失败：" + ex.Message; }
         _data.Tasks ??= []; _notes.Text = _data.Notes ?? ""; _taskScroll = new ScrollViewer { Content = _tasks, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         Children.Add(_notes); Children.Add(_taskScroll); Grid.SetRow(_status, 1); Children.Add(_status);
         _notes.TextChanged += (_, _) => { _dirty = true; _saveTimer.Stop(); _saveTimer.Start(); };
         _saveTimer.Tick += (_, _) => { _saveTimer.Stop(); Flush(); };
-        Unloaded += (_, _) => { _saveTimer.Stop(); Flush(); };
+        Loaded += (_, _) => { if (!_retired) ActiveInstances.Add(this); };
+        Unloaded += (_, _) => { _saveTimer.Stop(); Flush(); ActiveInstances.Remove(this); };
         var menu = new ContextMenu();
         Menu(menu, "便签", () => Switch("notes")); Menu(menu, "待办", () => { _showArchived = false; Switch("todo"); });
         Menu(menu, "添加待办", AddTask); Menu(menu, "归档记录", () => { _showArchived = true; Switch("todo"); });
@@ -74,12 +78,12 @@ public sealed class ProductivityWidget : Grid, IProfileReplacementParticipant
             config.Widgets[_instanceId] = WorkbenchRules.Clone(_data); _store.Save("optional-workbench.json", config);
             _dirty = false; _status.Text = _showArchived ? "归档记录 · 右键恢复" : "已自动保存 · 右键切换视图";
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or FutureSchemaException)
         { _status.Text = "保存失败，内容仍保留在当前组件：" + ex.Message; }
     }
     public void PrepareForProfileReplacement()
     {
-        FlushBeforeProfileReplacement();_retired=true;
+        FlushBeforeProfileReplacement();_retired=true;ActiveInstances.Remove(this);
     }
     public void FlushBeforeProfileReplacement()
     {

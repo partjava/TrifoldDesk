@@ -56,7 +56,7 @@ public sealed class ConfigManager(string directory)
             {
                 string preserved = path + ".corrupt-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fffffff");
                 // A failed preservation must stop the load; silently overwriting would lose user data.
-                File.Copy(path, preserved);
+                File.Copy(path, preserved, true);
                 try
                 {
                     CheckSchema<T>(path + ".bak");
@@ -126,9 +126,14 @@ public sealed class ConfigManager(string directory)
                 if (File.Exists(path))
                 {
                     // Do not replace a good backup with a corrupt primary recovered during Load.
-                    bool valid;
-                    try { using var parsed = JsonDocument.Parse(File.ReadAllText(path)); valid = parsed.RootElement.ValueKind != JsonValueKind.Null; }
-                    catch (JsonException) { valid = false; }
+                    bool valid = true;
+                    try
+                    {
+                        CheckSchema<T>(path);
+                        _ = Read<T>(path);
+                        ProfilePackage.ValidateConfig(Path.GetFileName(path), File.ReadAllBytes(path));
+                    }
+                    catch { valid = false; }
                     File.Replace(temp, path, valid ? path + ".bak" : null);
                 }
                 else File.Move(temp, path);
@@ -152,7 +157,7 @@ public static class LibraryRules
     public static bool Matches(ShortcutItem item, string query, string group)
     {
         bool inGroup = string.IsNullOrWhiteSpace(group) || group == "全部分组" || string.Equals(item.Group, group, StringComparison.OrdinalIgnoreCase);
-        query = query.Trim();
+        query = (query ?? "").Trim();
         return inGroup && (query.Length == 0 || new[] { item.Name, item.SourcePath, item.Group }.Any(s => (s ?? "").Contains(query, StringComparison.OrdinalIgnoreCase)));
     }
     public static List<ShortcutItem> SortByName(IEnumerable<ShortcutItem> items, bool descending) =>

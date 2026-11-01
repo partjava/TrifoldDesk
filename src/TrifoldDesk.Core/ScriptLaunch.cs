@@ -8,17 +8,18 @@ public static class ScriptLaunchRules
     public static ScriptLaunchPlan Create(ShortcutItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
-        string source=Environment.ExpandEnvironmentVariables(item.SourcePath ?? "");
-        if(!File.Exists(source)&&!Directory.Exists(source))throw new FileNotFoundException("入口已失效，请重新定位。",source);
         string mode=string.IsNullOrWhiteSpace(item.LaunchMode)?"shell":item.LaunchMode;
+        string source=Environment.ExpandEnvironmentVariables(item.SourcePath ?? "");
+        if(mode=="shell"&&source.StartsWith("shell:",StringComparison.OrdinalIgnoreCase))return new(source,true,"",Array.Empty<string>());
+        if(!File.Exists(source)&&!Directory.Exists(source))throw new FileNotFoundException("入口已失效，请重新定位。",source);
         if(mode=="shell")return new(source,true,"",Array.Empty<string>());
         if(mode is not ("python" or "powershell" or "program"))throw new ArgumentException("不支持的启动方式。",nameof(item));
         string executable=Environment.ExpandEnvironmentVariables(item.ExecutablePath ?? "");
         if(!Path.IsPathFullyQualified(executable)||!File.Exists(executable))throw new FileNotFoundException("请指定存在的解释器或程序完整路径。",executable);
-        if(mode=="python"&&!Path.GetExtension(source).Equals(".py",StringComparison.OrdinalIgnoreCase))throw new ArgumentException("Python 模式需要 .py 脚本。");
-        if(mode=="powershell"&&!Path.GetExtension(source).Equals(".ps1",StringComparison.OrdinalIgnoreCase))throw new ArgumentException("PowerShell 模式需要 .ps1 脚本。");
+        if(mode=="python"&&(!File.Exists(source)||!Path.GetExtension(source).Equals(".py",StringComparison.OrdinalIgnoreCase)))throw new ArgumentException("Python 模式需要 .py 脚本。");
+        if(mode=="powershell"&&(!File.Exists(source)||!Path.GetExtension(source).Equals(".ps1",StringComparison.OrdinalIgnoreCase)))throw new ArgumentException("PowerShell 模式需要 .ps1 脚本。");
         string directory=Environment.ExpandEnvironmentVariables(item.WorkingDirectory ?? "");
-        if(string.IsNullOrWhiteSpace(directory))directory=Path.GetDirectoryName(Path.GetFullPath(source)) ?? "";
+        if(string.IsNullOrWhiteSpace(directory))directory=Directory.Exists(source)?Path.GetFullPath(source):(Path.GetDirectoryName(Path.GetFullPath(source)) ?? "");
         if(!Path.IsPathFullyQualified(directory)||!Directory.Exists(directory))throw new DirectoryNotFoundException("工作目录不存在，请重新选择。");
         var arguments=new List<string>();
         if(mode=="python")arguments.Add(Path.GetFullPath(source));

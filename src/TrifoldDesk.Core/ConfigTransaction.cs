@@ -24,6 +24,7 @@ public static class ConfigTransaction
         {
             Recover(directory);
             if (configurations.Count == 0) return;
+            if (configurations.Count > Allowed.Count) throw new InvalidDataException("事务配置名称无效或重复。");
             var unique = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var config in configurations)
             {
@@ -95,7 +96,7 @@ public static class ConfigTransaction
             catch (JsonException ex) { throw new InvalidDataException("配置事务日志无效，已保留原文件。", ex); }
             const string prefix = "config-transaction-";
             if (journal.Version != 1 || journal.StagingDirectory == null || !journal.StagingDirectory.StartsWith(prefix, StringComparison.Ordinal) ||
-                !Guid.TryParseExact(journal.StagingDirectory[prefix.Length..], "N", out _) || journal.Files == null || journal.Files.Count is < 1 or > 5)
+                !Guid.TryParseExact(journal.StagingDirectory[prefix.Length..], "N", out _) || journal.Files == null || journal.Files.Count < 1 || journal.Files.Count > Allowed.Count)
                 throw new InvalidDataException("配置事务日志版本或暂存路径无效。");
             var stage = Path.Combine(directory, journal.StagingDirectory);
             RejectLink(stage); RejectLink(Path.Combine(stage, "new"));
@@ -127,7 +128,7 @@ public static class ConfigTransaction
     }
     private static void Validate(string name, byte[] bytes)
     {
-        if (name != "panes.json") ProfilePackage.ValidateConfig(name, bytes);
+        if (!name.Equals("panes.json", StringComparison.OrdinalIgnoreCase)) ProfilePackage.ValidateConfig(name, bytes);
         else
         {
             using var document = JsonDocument.Parse(bytes);

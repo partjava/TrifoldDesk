@@ -21,7 +21,7 @@ public static class PluginProtocol
  {
   if(manifest.ApiVersion!=1||!ValidId(manifest.Id)||string.IsNullOrWhiteSpace(manifest.Name)||manifest.Name.Length>100||!System.Version.TryParse(manifest.Version,out _))throw new InvalidDataException("插件标识、版本或API不兼容。");
   if(string.IsNullOrWhiteSpace(manifest.Executable)||Path.IsPathRooted(manifest.Executable)||manifest.Executable.Split('\\','/').Any(s=>s is "." or "..")||!manifest.Executable.EndsWith(".exe",StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("插件必须指定包内的EXE宿主。");
-  if(manifest.Arguments==null||manifest.Arguments.Count>32||manifest.Arguments.Any(a=>a==null||a.Length>1000||a.Contains('\0'))||manifest.Capabilities==null||manifest.Capabilities.Count>20)throw new InvalidDataException("插件参数无效。");
-  string root=Path.GetFullPath(directory),file=Path.GetFullPath(Path.Combine(root,manifest.Executable));if(!file.StartsWith(root+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("插件路径越界。");return file;
+  if(manifest.Arguments==null||manifest.Arguments.Count>32||manifest.Arguments.Any(a=>a==null||a.Length>1000||a.Contains('\0'))||manifest.Capabilities==null||manifest.Capabilities.Count>20||manifest.Capabilities.Any(c=>string.IsNullOrWhiteSpace(c)||c.Length>100||c.Contains('\0')))throw new InvalidDataException("插件参数无效。");
+  string root=Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)),file=Path.GetFullPath(Path.Combine(root,manifest.Executable.Replace('\\',Path.DirectorySeparatorChar).Replace('/',Path.DirectorySeparatorChar)));if(!file.StartsWith(root+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("插件路径越界。");return file;
  }
 }

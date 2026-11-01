@@ -25,6 +25,7 @@
     <Style TargetType="ComboBox">
       <Setter Property="Margin" Value="0,6,0,12"/><Setter Property="Padding" Value="6"/>
       <Setter Property="Foreground" Value="#202830"/>
+      <Setter Property="ItemTemplate"><Setter.Value><DataTemplate><TextBlock Text="{Binding}" Foreground="#202830"/></DataTemplate></Setter.Value></Setter>
       <Style.Resources><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#202830"/><Setter Property="FontFamily" Value="Segoe UI, Microsoft YaHei UI"/></Style></Style.Resources>
     </Style>
     <Style TargetType="ComboBoxItem">

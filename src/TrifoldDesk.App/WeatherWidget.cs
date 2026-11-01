@@ -27,7 +27,7 @@ public sealed class WeatherWidget : StackPanel, IProfileReplacementParticipant
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { _status.Text = "读取失败：" + ex.Message; }
         Children.Add(_city); Children.Add(_temperature); Children.Add(_detail); Children.Add(_status);
         var attribution = new TextBlock { Text = "Open-Meteo · GeoNames", Foreground = Brushes.LightGray, FontSize = 10, Opacity = .65, Margin = new Thickness(0, 4, 0, 0), ToolTip = "天气：open-meteo.com · 城市：GeoNames" }; Children.Add(attribution);
-        var menu = new ContextMenu(); Menu(menu, "选择城市…", async () => await ChooseCity()); Menu(menu, "刷新（30分钟缓存）", async () => await Refresh()); ContextMenu = menu;
+        var menu = new ContextMenu(); Menu(menu, "选择城市…", async () => await ChooseCity()); Menu(menu, "刷新（30分钟缓存）", async () => await Refresh(true)); ContextMenu = menu;
         _clock.Tick += async (_, _) => await Refresh();
         Loaded += async (_, _) => { if(_retired)return;_lifetime?.Dispose(); _lifetime = new(); _clock.Start(); await Refresh(); };
         Unloaded += (_, _) => { _clock.Stop(); _lifetime?.Cancel(); };
@@ -47,28 +47,27 @@ public sealed class WeatherWidget : StackPanel, IProfileReplacementParticipant
             _status.Text = "搜索城市…"; var cities = await _client.SearchAsync(query, _lifetime.Token);
             if (!IsLoaded) return;
             if (cities.Count == 0) { _status.Text = "未找到城市，请更换名称或加上国家 / 地区。"; return; }
-            var picker = new Window { Owner = owner, Title = "选择城市", Width = 420, Height = 320, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false };
+            var picker = new Window { Owner = owner, Title = "选择城市", Width = 420, Height = 320, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false, Background = new SolidColorBrush(Color.FromRgb(22, 36, 48)), Foreground = Brushes.WhiteSmoke };
             var panel = new DockPanel { Margin = new Thickness(14) }; picker.Content = panel;
             var choose = new Button { Content = "使用所选城市", Padding = new Thickness(8), Margin = new Thickness(0, 8, 0, 0) }; DockPanel.SetDock(choose, Dock.Bottom); panel.Children.Add(choose);
-            var list = new ListBox { ItemsSource = cities, SelectedIndex = 0 }; panel.Children.Add(list); choose.Click += (_, _) => picker.DialogResult = true;
+            var list = new ListBox { ItemsSource = cities, SelectedIndex = 0, Background = new SolidColorBrush(Color.FromRgb(16, 28, 38)), Foreground = Brushes.WhiteSmoke, BorderBrush = new SolidColorBrush(Color.FromRgb(45, 65, 82)) }; panel.Children.Add(list); choose.Click += (_, _) => picker.DialogResult = true;
             if (picker.ShowDialog() != true || list.SelectedItem is not WeatherCity selected) return;
             var next = WeatherRules.SelectCity(_data, selected); Save(next); _data = next; Render();
         }
         catch (OperationCanceledException) { if (IsLoaded) _status.Text = "城市搜索已取消或超时。"; }
         catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException or JsonException or ArgumentException) { _status.Text = "城市选择失败：" + ex.Message; }
         finally { _busy = false; }
-        await Refresh();
+        await Refresh(true);
     }
-    private async Task Refresh()
+    private async Task Refresh(bool force = false)
     {
-        if (_retired || _busy || _lifetime == null || _lifetime.IsCancellationRequested || !WeatherRules.NeedsRefresh(_data, DateTime.UtcNow)) return;
+        if (_retired || _busy || _lifetime == null || _lifetime.IsCancellationRequested || !WeatherRules.ValidCity(_data.City) || (!force && !WeatherRules.NeedsRefresh(_data, DateTime.UtcNow))) return;
         _busy = true;
         try
         {
-            _data.LastAttemptUtc = DateTime.UtcNow; Save(_data);
             var observation = await _client.ForecastAsync(_data.City!, _lifetime.Token);
             if (_retired || _lifetime.IsCancellationRequested || !IsLoaded) return;
-            _data.Cache = observation; Save(_data); _status.Text = ""; Render();
+            _data.LastAttemptUtc = DateTime.UtcNow; _data.Cache = observation; Save(_data); _status.Text = ""; Render();
         }
         catch (OperationCanceledException) { if (IsLoaded) { Render(); _status.Text += "\n请求已取消或超时 · 保留上次数据"; } }
         catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException or JsonException or ArgumentException) { Render(); _status.Text += "\n离线 / 更新失败 · 保留上次数据\n" + ex.Message; }
@@ -85,7 +84,7 @@ public sealed class WeatherWidget : StackPanel, IProfileReplacementParticipant
         if (!WeatherRules.ValidCity(_data.City)) { _city.Text = "尚未选择城市"; _temperature.Text = "—"; _detail.Text = "右键选择城市以查看天气"; return; }
         _city.Text = _data.City!.ToString(); var cache = _data.Cache;
         _temperature.Text = cache?.TemperatureC is { } temperature ? temperature.ToString("0.#") + "°C" : "—";
-        if (cache == null) { _detail.Text = "暂无天气数据"; return; }
+        if (cache == null) { _detail.Text = "暂无天气数据"; _status.Text = "可右键刷新重试"; return; }
         _detail.Text = WeatherRules.Description(cache.WeatherCode) + "\n湿度 " + (cache.RelativeHumidity?.ToString("0") ?? "不可用") + (cache.RelativeHumidity != null ? "%" : "") + " · 风速 " + (cache.WindKmh?.ToString("0.#") ?? "不可用") + (cache.WindKmh != null ? " km/h" : "");
         _status.Text = "数据时间 " + cache.DataLocal.ToString("MM-dd HH:mm") + " " + cache.Timezone + "\n获取时间 " + cache.RetrievedUtc.ToLocalTime().ToString("MM-dd HH:mm") + (_readWarning == null ? "" : "\n" + _readWarning);
     }

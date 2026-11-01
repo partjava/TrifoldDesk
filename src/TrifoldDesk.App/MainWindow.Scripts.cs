@@ -9,6 +9,7 @@ public sealed class ScriptLaunchDialog : Window
         _item=item;Result=System.Text.Json.JsonSerializer.Deserialize<ShortcutItem>(System.Text.Json.JsonSerializer.Serialize(item))!;
         Title="启动方式 · "+item.Name;Width=520;Height=440;WindowStartupLocation=WindowStartupLocation.CenterOwner;Background=new SolidColorBrush(Color.FromRgb(22,36,48));
         var root=new StackPanel{Margin=new Thickness(24)};Content=root;
+        foreach(var box in new[]{_executable,_arguments,_directory}){box.Padding=new Thickness(8,6,8,6);box.Foreground=new SolidColorBrush(Color.FromRgb(24,34,44));box.Background=Brushes.White;}
         Add("启动方式",_mode);_mode.ItemsSource=new[]{"系统默认","Python","PowerShell","指定程序"};_mode.SelectedIndex=Array.IndexOf(new[]{"shell","python","powershell","program"},item.LaunchMode);if(_mode.SelectedIndex<0)_mode.SelectedIndex=0;
         Add("解释器 / 程序",_executable);_executable.Text=item.ExecutablePath;
         var browse=new Button{Content="选择程序…",HorizontalAlignment=HorizontalAlignment.Right};root.Children.Add(browse);browse.Click+=(_,_)=>{var picker=new OpenFileDialog{Filter="程序 (*.exe)|*.exe|全部文件|*.*"};if(picker.ShowDialog(this)==true)_executable.Text=picker.FileName;};
@@ -28,7 +29,11 @@ public partial class MainWindow
 {
     private void MenuLaunchSettings(object sender,RoutedEventArgs e)
     {
-        var view=ContextItem(sender);var dialog=new ScriptLaunchDialog(view.Item){Owner=this};if(dialog.ShowDialog()!=true)return;
+        var view=ContextItem(sender);
+        ScriptLaunchDialog dialog;
+        _dialogOpen=true;
+        try{dialog=new ScriptLaunchDialog(view.Item){Owner=this};if(dialog.ShowDialog()!=true)return;}
+        finally{_dialogOpen=false;_leftAt=DateTime.UtcNow;}
         var old=view.Item;var next=dialog.Result;var previous=(old.LaunchMode,old.ExecutablePath,old.Arguments,old.WorkingDirectory);
         old.LaunchMode=next.LaunchMode;old.ExecutablePath=next.ExecutablePath;old.Arguments=next.Arguments;old.WorkingDirectory=next.WorkingDirectory;
         if(!SaveShortcuts())(old.LaunchMode,old.ExecutablePath,old.Arguments,old.WorkingDirectory)=previous;
@@ -37,7 +42,10 @@ public partial class MainWindow
     private void EditFolderLaunch(string folderId,string itemId)
     {
         var item=ReadFolder(folderId).Items.FirstOrDefault(i=>i.Id==itemId);if(item==null)return;
-        var dialog=new ScriptLaunchDialog(item){Owner=this};if(dialog.ShowDialog()!=true)return;
+        ScriptLaunchDialog dialog;
+        _dialogOpen=true;
+        try{dialog=new ScriptLaunchDialog(item){Owner=this};if(dialog.ShowDialog()!=true)return;}
+        finally{_dialogOpen=false;_leftAt=DateTime.UtcNow;}
         var next=FolderRules.Clone(_folders);var folder=next.Items.First(f=>f.Id==folderId);int index=folder.Items.FindIndex(i=>i.Id==itemId);folder.Items[index]=dialog.Result;SaveFolders(next);
     }
 }

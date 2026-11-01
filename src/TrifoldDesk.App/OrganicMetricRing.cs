@@ -27,7 +27,7 @@ public sealed class OrganicMetricRing : FrameworkElement
             _target = Math.Clamp(next / 150 + Math.Abs(next - _last) / 35, 0, 1);
             _last = next;
         }
-        UpdateTimer(); InvalidateVisual();
+        UpdateTimer(); if (RenderBudget.CanDraw(this)) InvalidateVisual();
     }
     private void UpdateTimer()
     {

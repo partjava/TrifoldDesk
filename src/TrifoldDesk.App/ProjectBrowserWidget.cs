@@ -26,12 +26,17 @@ public sealed class ProjectBrowserWidget : Grid, IProfileReplacementParticipant
         Children.Add(_status); Grid.SetRow(_tree, 1); Children.Add(_tree); Grid.SetRow(_git, 2); Children.Add(_git);
         try { var loaded = store.Load<ProjectBrowserConfig>("optional-projects.json"); if (loaded.Value.Widgets?.TryGetValue(instanceId, out var data) == true) _rootPath = data.RootPath ?? ""; _status.Text = loaded.Warning ?? ""; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { _status.Text = "读取失败：" + ex.Message; }
-        var menu = new ContextMenu(); Menu(menu, "选择项目目录…", ChooseRoot); Menu(menu, "刷新目录 / Git", async () => { await LoadRoot(); await RefreshGit(); }); ContextMenu = menu;
+        var menu = new ContextMenu(); Menu(menu, "选择项目目录…", ChooseRoot); Menu(menu, "刷新目录 / Git", async () => { _lastGitAttempt = default; await LoadRoot(); await RefreshGit(); }); ContextMenu = menu;
         _clock.Tick += async (_, _) => await RefreshGit();
         Loaded += async (_, _) => { if(_retired)return;_lifetime?.Dispose(); _lifetime = new(); _clock.Start(); await LoadRoot(); await RefreshGit(); };
         Unloaded += (_, _) => { _clock.Stop(); _lifetime?.Cancel(); _pending.Clear(); };
         if (string.IsNullOrWhiteSpace(_rootPath)) { _status.Text = "尚未选择项目目录 · 右键选择"; _git.Text = "Git：未配置项目"; }
-        else { _status.Text = Path.GetFileName(_rootPath); _git.Text = "Git：等待读取"; }
+        else { _status.Text = DisplayPathName(_rootPath); _git.Text = "Git：等待读取"; }
+    }
+    private static string DisplayPathName(string path)
+    {
+        string name = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
+        return string.IsNullOrEmpty(name) ? path : name;
     }
     private static void Menu(ContextMenu menu, string title, Func<Task> action)
     {
@@ -58,7 +63,7 @@ public sealed class ProjectBrowserWidget : Grid, IProfileReplacementParticipant
         {
             var snapshot = await Task.Run(() => MappedDirectoryScanner.Scan(path, 500, token), token);
             if (token.IsCancellationRequested || !IsLoaded || path != _rootPath) return;
-            _status.Text = snapshot.Error == null ? Path.GetFileName(path) : "目录不可用：" + snapshot.Error; _status.ToolTip = path;
+            _status.Text = snapshot.Error == null ? DisplayPathName(path) : "目录不可用：" + snapshot.Error; _status.ToolTip = path;
             foreach (var entry in snapshot.Entries) _tree.Items.Add(Node(entry, token));
             if (snapshot.IsTruncated) _tree.Items.Add(new TreeViewItem { Header = "超过500个条目 · 请打开系统文件夹查看", IsEnabled = false });
         }
@@ -96,14 +101,14 @@ public sealed class ProjectBrowserWidget : Grid, IProfileReplacementParticipant
     }
     private async Task RefreshGit()
     {
-        if (_gitBusy || _lifetime == null || _lifetime.IsCancellationRequested || string.IsNullOrWhiteSpace(_rootPath) || DateTime.UtcNow - _lastGitAttempt < TimeSpan.FromSeconds(60)) return;
+        if (_gitBusy || _lifetime == null || _lifetime.IsCancellationRequested || string.IsNullOrWhiteSpace(_rootPath) || DateTime.UtcNow - _lastGitAttempt < TimeSpan.FromSeconds(55)) return;
         _gitBusy = true; _lastGitAttempt = DateTime.UtcNow; string path = _rootPath; var token = _lifetime.Token;
         try
         {
             var snapshot = await GitReadService.ReadAsync(path, token);
             if (token.IsCancellationRequested || !IsLoaded || path != _rootPath) return;
             _git.Text = snapshot.Error ?? (snapshot.Changes.Count == 0 ? "Git：工作区干净" : $"Git：{snapshot.Changes.Count} 个变更");
-            _git.ToolTip = snapshot.Error ?? string.Join("\n", snapshot.Changes.Take(30).Select(c => c.Status + " " + c.Path)) + (snapshot.Changes.Count > 30 ? "\n…" : "");
+            _git.ToolTip = snapshot.Error ?? (snapshot.Changes.Count == 0 ? null : string.Join("\n", snapshot.Changes.Take(30).Select(c => c.Status + " " + c.Path)) + (snapshot.Changes.Count > 30 ? "\n…" : ""));
         }
         catch (OperationCanceledException) { }
         finally { _gitBusy = false; }

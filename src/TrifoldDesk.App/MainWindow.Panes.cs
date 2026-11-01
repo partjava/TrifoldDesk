@@ -8,7 +8,7 @@ public partial class MainWindow
 {
     private PaneState _paneState = new();
     private readonly bool[] _paneBusy = new bool[3];
-    private readonly Canvas _paneLayer = new() { Background = null };
+    private readonly Canvas _paneLayer = new() { Background = null, IsHitTestVisible = false };
     private readonly List<MenuItem> _paneEntries = [];
     private void InitializePaneMenus()
     {
@@ -30,13 +30,29 @@ public partial class MainWindow
     }
     private void UpdatePaneClip()
     {
+        if(_collapsed)_paneLayer.Children.Clear();
         double width=PanelRoot.ActualWidth/3, height=PanelRoot.ActualHeight;
         var clip=new GeometryGroup();
+        var layerClip=new GeometryGroup();
         for(int n=0;n<3;n++)
         {
-            if(!_paneState.Folded[n]&&!_paneBusy[n])clip.Children.Add(new RectangleGeometry(new Rect(n*width,0,width,height)));
+            var rect=new RectangleGeometry(new Rect(n*width,0,width,height));
+            if(!_paneState.Folded[n]&&!_paneBusy[n])clip.Children.Add(rect);
+            if(!_paneState.Folded[n]||_paneBusy[n])layerClip.Children.Add(rect);
         }
         PanelRoot.Clip=clip;
+        _paneLayer.Clip=_paneBusy.Any(b=>b)?layerClip:clip;
+        if(Content is Grid root)
+        {
+            if(_foldOverlay!=null||!_paneState.Folded.Any(f=>f))root.Clip=null;
+            else if(_paneState.Folded.All(f=>f)&&!_paneBusy.Any(b=>b))
+            {
+                var strip=new GeometryGroup();
+                if(PanelRoot.ActualWidth>0&&height>0)strip.Children.Add(new RectangleGeometry(new Rect(Math.Max(0,PanelRoot.ActualWidth-16),0,Math.Min(16,PanelRoot.ActualWidth),height)));
+                root.Clip=strip;
+            }
+            else root.Clip=layerClip;
+        }
     }
     private void TogglePane(int index)
     {
@@ -53,7 +69,7 @@ public partial class MainWindow
         _paneState=next;_paneBusy[index]=true;UpdatePaneClip();
         var degrees=new DoubleAnimation(folded?0:85,folded?85:0,TimeSpan.FromMilliseconds(160)){EasingFunction=new CubicEase{EasingMode=EasingMode.EaseInOut}};
         projection.Rotation.BeginAnimation(System.Windows.Media.Media3D.AxisAngleRotation3D.AngleProperty,degrees);
-        var timer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(180) }; timer.Tick+=(_,_)=>{timer.Stop();_paneLayer.Children.Remove(image);_paneBusy[index]=false;UpdatePaneClip();}; timer.Start();
+        var timer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(180) }; timer.Tick+=(_,_)=>{timer.Stop();_paneLayer.Children.Remove(image);if(_collapsed)_paneLayer.Children.Clear();_paneBusy[index]=false;UpdatePaneClip();}; timer.Start();
     }
     internal bool TestPaneFolded(int index)=>_paneState.Folded[index];
     internal void TestTogglePane(int index)=>TogglePane(index);

@@ -42,10 +42,13 @@ public static class ProfilePackageTests
             new ConfigManager(source).Save("monitors.json",new MonitorLayoutConfig());
             var stalePath=Path.Combine(source,"app-links","missing-generated.lnk");
             new ConfigManager(source).Save("extra-reference.json",new{SourcePath=stalePath});
+            var missingProjectRoot=Path.Combine(root,"missing-project-dir");
+            new ConfigManager(source).Save("optional-projects.json",new ProjectBrowserConfig{Widgets=new(){["p"]=new(){RootPath=missingProjectRoot}}});
+            File.WriteAllText(Path.Combine(source,"manifest.json"),"{}");
             var archive = Path.Combine(root, "profile.zip"); ProfilePackage.Export(source, archive);
-            using(var zip=ZipFile.OpenRead(archive))check(zip.GetEntry("plugin-approvals.json")==null,"plugin execution approvals never travel with a profile export");
+            using(var zip=ZipFile.OpenRead(archive))check(zip.GetEntry("plugin-approvals.json")==null && zip.Entries.Count(e=>e.FullName.Equals("manifest.json",StringComparison.OrdinalIgnoreCase))==1,"plugin execution approvals never travel with a profile export and stray manifest.json is not duplicated");
             var preview = ProfilePackage.Preview(archive);
-            check(preview.MissingExternalPaths.Contains(stalePath),"stale managed links remain restorable with a missing-path warning");
+            check(preview.MissingExternalPaths.Contains(stalePath) && preview.MissingExternalPaths.Contains(missingProjectRoot),"stale managed links and project root paths remain restorable with a missing-path warning");
             check(preview.MissingExternalPaths.Contains(Path.Combine(root, "missing.txt")), "package preview reports missing external documents");
             using (var zip = ZipFile.OpenRead(archive)) check(!zip.Entries.Any(e => e.Name == "original.txt"), "package never copies external documents");
             var target = Path.Combine(root, "target"); Directory.CreateDirectory(target); File.WriteAllText(Path.Combine(target, "arbitrary-plugin-state.bin"), "old-profile");

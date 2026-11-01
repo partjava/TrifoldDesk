@@ -76,6 +76,7 @@ public static class DesktopHostService
         if (!IsWindow(state.Hwnd)) { state.Host = IntPtr.Zero; return; }
         if (!GetWindowRect(state.Hwnd, out var rect)) rect = state.InitialRect;
         var parent = state.Parent != IntPtr.Zero && IsWindow(state.Parent) ? state.Parent : IntPtr.Zero;
+        if (parent == IntPtr.Zero) { SetNativeLong(state.Hwnd, StyleIndex, state.Style); SetNativeLong(state.Hwnd, ExtendedStyleIndex, state.ExtendedStyle); }
         ClearLastError(0); var old = SetParent(state.Hwnd, parent); int error = Marshal.GetLastWin32Error();
         if (old == IntPtr.Zero && error != 0) throw new Win32Exception(error);
         SetNativeLong(state.Hwnd, StyleIndex, state.Style); SetNativeLong(state.Hwnd, ExtendedStyleIndex, state.ExtendedStyle);

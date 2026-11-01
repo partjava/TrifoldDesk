@@ -13,7 +13,7 @@ public static class FolderWorkspaceRules
         if (string.IsNullOrWhiteSpace(childId) || string.IsNullOrWhiteSpace(parentId) || childId == parentId) return false;
         var folders = config.Items ?? [];
         if (folders.Count(f => f != null && f.Id == childId) != 1 || folders.Count(f => f != null && f.Id == parentId) != 1) return false;
-        if (!string.IsNullOrWhiteSpace(folders.Single(f => f.Id == parentId).DirectoryPath)) return false;
+        if (!string.IsNullOrWhiteSpace(folders.Single(f => f != null && f.Id == parentId).DirectoryPath)) return false;
         var visited = new HashSet<string>(StringComparer.Ordinal);
         var pending = new Stack<string>(); pending.Push(childId);
         while (pending.TryPop(out var id))
@@ -33,9 +33,9 @@ public static class FolderWorkspaceRules
         var next = FolderRules.Clone(config);
         if (!CanNest(config, childId, parentId)) return new(next, false, "无法嵌套：文件夹不存在、目标是映射目录，或操作会产生循环引用。");
         if (slot is < 0 or > 4095) return new(next, false, "格位必须在0到4095之间。");
-        var child = next.Items.Single(f => f.Id == childId);
-        var parent = next.Items.Single(f => f.Id == parentId);
-        var link = next.Items.SelectMany(f => f.Items ?? []).FirstOrDefault(i => i != null && i.ChildFolderId == childId);
+        var child = next.Items.Single(f => f != null && f.Id == childId);
+        var parent = next.Items.Single(f => f != null && f.Id == parentId);
+        var link = next.Items.Where(f => f != null).SelectMany(f => f.Items ?? []).FirstOrDefault(i => i != null && i.ChildFolderId == childId);
         RemoveReferences(next, childId);
         child.ParentFolderId = parentId;
         parent.Items ??= [];
@@ -84,7 +84,7 @@ public static class FolderWorkspaceRules
             return new(next, false, "文件夹入口重复、已嵌套或关联数据不存在。");
         next.Items ??= [];
         next.Items.Add(new FolderData { Id = folderId, Name = string.IsNullOrWhiteSpace(name) ? "新建文件夹" : name, Items = [target.Item, dragged.Item], Slots = new() { [targetId] = 0, [draggedId] = 1 } });
-        foreach (var id in childIds) next.Items.Single(f => f.Id == id).ParentFolderId = folderId;
+        foreach (var id in childIds) next.Items.Single(f => f != null && f.Id == id).ParentFolderId = folderId;
         int index = entries.TakeWhile(e => !ReferenceEquals(e, target)).Count(e => !ReferenceEquals(e, dragged));
         entries.Remove(target); entries.Remove(dragged);
         entries.Insert(Math.Min(index, entries.Count), new DesktopEntry {

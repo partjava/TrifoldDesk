@@ -10,6 +10,8 @@ public sealed class MusicWidget : Border, IProfileReplacementParticipant
     private readonly Image _cover = new() { Width = 92, Height = 92, Stretch = Stretch.UniformToFill };
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
     private GlobalSystemMediaTransportControlsSession? _session;
+    private static readonly Dictionary<string, string?> PreferredSources = new();
+    private readonly string _instanceId;
     private string? _preferredSource;
     private bool _active, _queued, _refreshAgain;
     private bool _retired;
@@ -17,6 +19,8 @@ public sealed class MusicWidget : Border, IProfileReplacementParticipant
     public MusicWidget(string instanceId, ConfigManager store)
     {
         ArgumentNullException.ThrowIfNull(store);
+        _instanceId = instanceId;
+        PreferredSources.TryGetValue(instanceId, out _preferredSource);
         Tag = instanceId; Background = Brushes.Transparent; Padding = new Thickness(10);
         var root = new Grid(); root.ColumnDefinitions.Add(new() { Width = new GridLength(104) }); root.ColumnDefinitions.Add(new());
         var art = new Grid { Width = 92, Height = 92, VerticalAlignment = VerticalAlignment.Top };
@@ -87,6 +91,11 @@ public sealed class MusicWidget : Border, IProfileReplacementParticipant
         {
             var media = await session.TryGetMediaPropertiesAsync();
             var playback = session.GetPlaybackInfo();
+            if (media == null || playback == null)
+            {
+                if (_active && generation == _generation && ReferenceEquals(session, _session)) Empty("媒体信息暂不可用");
+                return;
+            }
             BitmapImage? cover = null;
             string? coverWarning = null;
             if (media.Thumbnail != null)
@@ -125,11 +134,11 @@ public sealed class MusicWidget : Border, IProfileReplacementParticipant
             ActionMenu("下一首", controls?.IsNextEnabled == true, s => s.TrySkipNextAsync().AsTask());
             ContextMenu.Items.Add(new Separator());
             var current = new MenuItem { Header = "跟随系统当前会话", IsCheckable = true, IsChecked = _preferredSource == null };
-            current.Click += (_, _) => { _preferredSource = null; ChooseSession(); }; ContextMenu.Items.Add(current);
+            current.Click += (_, _) => { _preferredSource = null; PreferredSources.Remove(_instanceId); ChooseSession(); }; ContextMenu.Items.Add(current);
             foreach (var source in _manager?.GetSessions().Select(s => s.SourceAppUserModelId).Distinct().Take(20) ?? [])
             {
                 var option = new MenuItem { Header = source, IsCheckable = true, IsChecked = _preferredSource == source };
-                option.Click += (_, _) => { _preferredSource = source; ChooseSession(); }; ContextMenu.Items.Add(option);
+                option.Click += (_, _) => { _preferredSource = source; PreferredSources[_instanceId] = source; ChooseSession(); }; ContextMenu.Items.Add(option);
             }
             var refresh = new MenuItem { Header = "刷新媒体信息" }; refresh.Click += (_, _) => ChooseSession(); ContextMenu.Items.Add(refresh);
         }

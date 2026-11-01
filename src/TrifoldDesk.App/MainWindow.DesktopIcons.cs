@@ -62,12 +62,13 @@ public partial class MainWindow
         var item=drag.MappedItem??(drag.Desktop?existing?.Item:folder?.Items.FirstOrDefault(i=>i.Id==drag.ItemId));
         if(drag.MappedItem!=null)copy=true;
         if(item==null)return false;
+        if(!string.IsNullOrEmpty(item.ChildFolderId))copy=false;
         if(copy)item=System.Text.Json.JsonSerializer.Deserialize<ShortcutItem>(System.Text.Json.JsonSerializer.Serialize(item))!;
         if(copy)item.Id=Guid.NewGuid().ToString("N");
         // A folder exit remains on that folder's page even if the pointer crosses a fold seam.
-        int pane=drag.Desktop?existing!.PaneIndex:WorkspaceSourcePane(drag.FolderId);
+        int pane=drag.Desktop?WidgetLayout.NearestPane(point.X,1,Math.Max(1,WidgetCanvas.ActualWidth)):WorkspaceSourcePane(drag.FolderId);
         var bounds=WidgetLayout.ClampToPane(point.X-35,point.Y-25,70,70,pane,WidgetCanvas.ActualWidth,WidgetCanvas.ActualHeight,70,70);
-        if(drag.Desktop&&!copy) { existing!.X=bounds.X;existing.Y=bounds.Y; }
+        if(drag.Desktop&&!copy) { existing!.X=bounds.X;existing.Y=bounds.Y;existing.PaneIndex=pane; }
         else next.DesktopEntries.Add(new DesktopEntry{Item=item,X=bounds.X,Y=bounds.Y,PaneIndex=pane});
         if(!drag.Desktop&&!copy&&drag.MappedItem==null) {folder!.Items.RemoveAll(i=>i.Id==drag.ItemId);folder.Slots.Remove(drag.ItemId);if(!string.IsNullOrEmpty(item.ChildFolderId)){var child=next.Items.FirstOrDefault(f=>f.Id==item.ChildFolderId);if(child!=null)child.ParentFolderId="";}}
         return SaveFolders(next);

@@ -22,6 +22,9 @@ public static class ExtraWidgetTests
         check(WeatherRules.NeedsRefresh(weather, now), "explicitly selected city permits initial weather request");
         weather.LastAttemptUtc = now;
         check(!WeatherRules.NeedsRefresh(weather, now.AddMinutes(29)) && WeatherRules.NeedsRefresh(weather, now.AddMinutes(30)), "weather requests including failures are limited to once each thirty minutes");
+        weather.LastAttemptUtc = now.AddHours(2);
+        check(WeatherRules.NeedsRefresh(weather, now), "future weather attempt timestamp from clock skew allows refresh");
+        weather.LastAttemptUtc = now;
         weather.Cache = new WeatherObservation { DataLocal = new(2026, 10, 6, 8, 0, 0), RetrievedUtc = now, TemperatureC = 21 };
         var movedCity = WeatherRules.SelectCity(weather, new() { Name = "上海", Latitude = 31.2, Longitude = 121.5 });
         check(movedCity.Cache == null && movedCity.LastAttemptUtc == default && weather.Cache != null, "changing selected city clears mismatched weather cache without altering source");

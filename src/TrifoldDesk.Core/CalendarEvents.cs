@@ -63,7 +63,7 @@ public static class CalendarEventRules
                 for (int year = Math.Max(item.StartLocal.Year, fromLocal.Year); year <= untilLocal.Year; year++)
                 {
                     if (item.StartLocal.Month == 2 && item.StartLocal.Day == 29 && !DateTime.IsLeapYear(year)) continue;
-                    Add(new DateTime(year, item.StartLocal.Month, item.StartLocal.Day).AddTicks(item.StartLocal.TimeOfDay.Ticks));
+                    Add(new DateTime(year, item.StartLocal.Month, item.StartLocal.Day, 0, 0, 0, item.StartLocal.Kind).AddTicks(item.StartLocal.TimeOfDay.Ticks));
                 }
                 break;
         }

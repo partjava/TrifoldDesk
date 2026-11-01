@@ -12,8 +12,10 @@ public static class CalendarEventsTests
         var occurrences = CalendarEventRules.Occurrences(weekly, new(2026, 10, 1), new(2026, 10, 20));
         check(occurrences.Select(o => o.StartLocal).SequenceEqual([new DateTime(2026, 10, 5, 9, 30, 0), new(2026, 10, 12, 9, 30, 0), new(2026, 10, 19, 9, 30, 0)]), "weekly recurrence retains weekday and local time across weeks");
         check(CalendarEventRules.Occurrences(weekly, new(2026, 10, 5, 9, 30, 1), new(2026, 10, 12, 9, 30, 0)).Count == 0, "occurrence range uses inclusive start and exclusive end");
-        var leap = new CalendarEvent { Id = "leap", Title = "闰日", StartLocal = new(2024, 2, 29, 18, 15, 0), Recurrence = EventRecurrence.Yearly };
-        check(CalendarEventRules.Occurrences(leap, new(2025, 1, 1), new(2029, 1, 1)).Single().StartLocal == new DateTime(2028, 2, 29, 18, 15, 0), "yearly February 29 skips non-leap years");
+        var leap = new CalendarEvent { Id = "leap", Title = "闰日", StartLocal = new(2024, 2, 29, 18, 15, 0, DateTimeKind.Local), Recurrence = EventRecurrence.Yearly };
+        var leapOcc = CalendarEventRules.Occurrences(leap, new(2025, 1, 1), new(2029, 1, 1)).Single();
+        check(leapOcc.StartLocal == new DateTime(2028, 2, 29, 18, 15, 0, DateTimeKind.Local) && leapOcc.StartLocal.Kind == DateTimeKind.Local, "yearly February 29 skips non-leap years and preserves DateTimeKind");
+        check(CalendarMonth.Days(DateTime.MaxValue).Count == 42, "calendar month grid handles DateTime.MaxValue without overflow");
         check(CalendarEventRules.Occurrences(leap, new(2020, 1, 1), new(2024, 1, 1)).Count == 0, "recurrence never invents occurrences before original start");
         var once = new CalendarEvent { Id = "once", Title = "一次", StartLocal = new(2026, 10, 6, 13, 0, 0) };
         check(CalendarEventRules.Occurrences(once, new(2026, 10, 1), new(2026, 11, 1)).Count == 1, "nonrecurring event appears once");

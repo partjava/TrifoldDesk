@@ -29,7 +29,7 @@ public static class ProfilePackage
     private static readonly string[] GeneratedRoots = ["app-links", "icons", "assets", "resources"];
     private static readonly string[] AssetRoots = ["app-links", "icons", "assets", "resources", "plugins", "plugin-data"];
     private static readonly HashSet<string> PathProperties = new(StringComparer.Ordinal)
-        { "SourcePath", "TargetPath", "IconPath", "WorkingDirectory", "ExecutablePath", "DirectoryPath" };
+        { "SourcePath", "TargetPath", "IconPath", "WorkingDirectory", "ExecutablePath", "DirectoryPath", "RootPath" };
 
     public static void Export(string profileDirectory, string archivePath)
     {
@@ -42,6 +42,7 @@ public static class ProfilePackage
             var path = Path.Combine(root, name);
             if (File.Exists(path))
             {
+                if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("不导出符号链接资源。");
                 var original = ReadBounded(path);
                 try { ValidateConfig(name, original); }
                 catch (FutureSchemaException)
@@ -54,14 +55,15 @@ public static class ProfilePackage
             var node = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path)) : DefaultConfig(name);
             if (node is not JsonObject) throw new InvalidDataException($"配置 {name} 不是对象。");
             RewritePaths(node, value => ToPortable(value, root));
-            files.Add(name, System.Text.Encoding.UTF8.GetBytes(node.ToJsonString(Json)));
+            AddFile(files, name, System.Text.Encoding.UTF8.GetBytes(node.ToJsonString(Json)));
         }
         // Preserve extra root JSON (including pane state) without stripping unknown properties.
         if (Directory.Exists(root))
             foreach (var path in Directory.EnumerateFiles(root, "*.json"))
             {
                 var name = Path.GetFileName(path);
-                if (files.ContainsKey(name) || name == ConfigTransaction.PendingFileName || name.Equals("plugin-approvals.json",StringComparison.OrdinalIgnoreCase)) continue;
+                if (files.ContainsKey(name) || name.Equals(ConfigTransaction.PendingFileName, StringComparison.OrdinalIgnoreCase) || name.Equals("manifest.json", StringComparison.OrdinalIgnoreCase) || name.Equals("plugin-approvals.json", StringComparison.OrdinalIgnoreCase)) continue;
+                if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("不导出符号链接资源。");
                 var original=ReadBounded(path);
                 try{ValidateConfig(name,original);}catch(FutureSchemaException){AddFile(files,name,original);continue;}
                 var node = JsonNode.Parse(File.ReadAllText(path)) ?? throw new InvalidDataException($"配置 {name} 为空。");
@@ -204,17 +206,18 @@ public static class ProfilePackage
     {
         try
         {
+            var key = name.ToLowerInvariant();
             using var document = JsonDocument.Parse(bytes);
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object) throw new JsonException();
-            int supported = name switch {"widgets.json"=>new WidgetConfig().SchemaVersion,"settings.json"=>new AppSettings().SchemaVersion,"folders.json"=>new FolderConfig().SchemaVersion,"shortcuts.json"=>new ShortcutConfig().SchemaVersion,_=>1};
+            int supported = key switch {"widgets.json"=>new WidgetConfig().SchemaVersion,"settings.json"=>new AppSettings().SchemaVersion,"folders.json"=>new FolderConfig().SchemaVersion,"shortcuts.json"=>new ShortcutConfig().SchemaVersion,_=>1};
             if (root.TryGetProperty("SchemaVersion", out var version))
             {
                 if (version.ValueKind == JsonValueKind.Number && version.GetDouble() > supported)
                     throw new FutureSchemaException($"{name} 配置版本 {version.GetRawText()} 高于支持版本 {supported}，禁止导入覆盖。");
                 if (!version.TryGetInt32(out int number) || number < 1) throw new JsonException("配置版本无效。");
             }
-            object? value = name switch
+            object? value = key switch
             {
                 "settings.json" => JsonSerializer.Deserialize<AppSettings>(bytes),
                 "shortcuts.json" => JsonSerializer.Deserialize<ShortcutConfig>(bytes),
@@ -246,7 +249,7 @@ public static class ProfilePackage
                     if(year==null||HolidayRules.Validate(year)!=null)throw new JsonException("节假日数据无效。");
                 }
             }
-            if (name != "settings.json" && root.TryGetProperty("Items", out var items) &&
+            if (key != "settings.json" && root.TryGetProperty("Items", out var items) &&
                 (items.ValueKind != JsonValueKind.Array || items.EnumerateArray().Any(e => e.ValueKind != JsonValueKind.Object))) throw new JsonException("Items 无效。");
         }
         catch (JsonException ex) { throw new InvalidDataException($"配置 {name} 无效。", ex); }
@@ -290,7 +293,7 @@ public static class ProfilePackage
         if (!IsWithin(full, root)) return value;
         var relative = Path.GetRelativePath(root, full).Replace('\\', '/');
         // A stale managed path remains absolute and is reported missing, rather than producing an unrestorable package.
-        return IsGenerated(relative) && (File.Exists(full)||Directory.Exists(full)) ? relative : value;
+        return IsGenerated(relative) && File.Exists(full) ? relative : value;
     }
     private static string FromPortable(string value, string root, Dictionary<string, byte[]> files)
     {
@@ -304,6 +307,7 @@ public static class ProfilePackage
     private static bool IsGenerated(string path) => GeneratedRoots.Any(root => path.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase));
     private static bool IsWithin(string path, string root) => path.StartsWith(Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     private static bool AllowedFile(string path) => !path.Equals(ConfigTransaction.PendingFileName, StringComparison.OrdinalIgnoreCase) &&
+        !path.Equals("manifest.json", StringComparison.OrdinalIgnoreCase) &&
         ((!path.Contains('/') && path.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) || AssetRoots.Any(a => path.StartsWith(a + "/", StringComparison.OrdinalIgnoreCase)));
     private static void RewritePaths(JsonNode node, Func<string, string> rewrite)
     {

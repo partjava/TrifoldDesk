@@ -33,13 +33,15 @@ public sealed class ExternalPluginWidget : StackPanel, IProfileReplacementPartic
    {
     if(!approve){_status.Text="插件需要授权 · 右键允许启动";return;}
     if(MessageBox.Show(Window.GetWindow(this),$"启动 {manifest.Name} {manifest.Version}？\n此插件以独立进程运行，仍具有当前用户的本机权限。\n声明能力：{string.Join("、",manifest.Capabilities)}", "第三方插件",MessageBoxButton.OKCancel,MessageBoxImage.Information,MessageBoxResult.Cancel)!=MessageBoxResult.OK)return;
+    if(!_active||generation!=_generation)return;
     approved.Hashes[_id]=hash;_store.Save("plugin-approvals.json",approved);
    }
    var utf8=new System.Text.UTF8Encoding(false,true);
    var info=new ProcessStartInfo(executable){WorkingDirectory=directory,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,RedirectStandardError=true,StandardInputEncoding=utf8,StandardOutputEncoding=utf8};foreach(var arg in manifest.Arguments)info.ArgumentList.Add(arg);
-   var worker=new Process{StartInfo=info};if(!worker.Start())throw new IOException("插件进程未启动");_worker=worker;_cancel=new CancellationTokenSource();
+   var worker=new Process{StartInfo=info};if(!worker.Start())throw new IOException("插件进程未启动");var cancel=new CancellationTokenSource();_worker=worker;_cancel=cancel;
    await worker.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new{apiVersion=1,type="init"}));await worker.StandardInput.FlushAsync();
-   _status.Text="正在连接插件…";_ = ReadOutput(worker,_cancel.Token,generation);_ = DrainErrors(worker,_cancel.Token);
+   if(!_active||generation!=_generation||cancel.IsCancellationRequested)return;
+   _status.Text="正在连接插件…";_ = ReadOutput(worker,cancel.Token,generation);_ = DrainErrors(worker,cancel.Token);
   }
   catch(Exception ex){App.Log(ex);_status.Text="插件不可用："+ex.Message;Stop();}
  }
@@ -47,16 +49,20 @@ public sealed class ExternalPluginWidget : StackPanel, IProfileReplacementPartic
  {
   try
   {
+   bool firstMessage=true;
    while(!token.IsCancellationRequested)
    {
     // Read in bounded chunks: a malicious worker cannot allocate an unbounded line.
     var line=new System.Text.StringBuilder();var character=new char[1];
-    using var deadline=CancellationTokenSource.CreateLinkedTokenSource(token);deadline.CancelAfter(TimeSpan.FromSeconds(45));
+    using var deadline=firstMessage?CancellationTokenSource.CreateLinkedTokenSource(token):null;
+    deadline?.CancelAfter(TimeSpan.FromSeconds(45));
+    var readToken=deadline?.Token??token;
     int count;
-    while((count=await worker.StandardOutput.ReadAsync(character.AsMemory(),deadline.Token))>0 && character[0]!='\n'){if(line.Length>=16384)throw new InvalidDataException("插件输出过长");if(character[0]!='\r')line.Append(character[0]);}
-    if(count==0)throw new IOException("插件输出通道已关闭");
+    while((count=await worker.StandardOutput.ReadAsync(character.AsMemory(),readToken))>0 && character[0]!='\n'){if(line.Length>=16384)throw new InvalidDataException("插件输出过长");if(character[0]!='\r')line.Append(character[0]);}
+    if(count==0&&line.Length==0)throw new IOException("插件输出通道已关闭");
     if(line.Length==0)continue;
     var output=PluginProtocol.Parse(line.ToString());
+    firstMessage=false;
     if(!_active||generation!=_generation)return;
     await Dispatcher.InvokeAsync(()=>{if(generation==_generation)_status.Text=output.Title+"\n"+string.Join("\n",output.Lines);});
    }
@@ -68,4 +74,3 @@ public sealed class ExternalPluginWidget : StackPanel, IProfileReplacementPartic
  private void Stop(){_generation++;_cancel?.Cancel();_cancel?.Dispose();_cancel=null;try{if(_worker!=null&&!_worker.HasExited)_worker.Kill(true);}catch(Exception ex){App.Log(ex);}_worker?.Dispose();_worker=null;}
  public void PrepareForProfileReplacement(){_retired=true;_active=false;Stop();}
 }
-

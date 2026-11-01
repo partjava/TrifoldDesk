@@ -124,6 +124,7 @@ public static class CalendarMonth
     {
         var first = new DateTime(month.Year, month.Month, 1);
         var start = first.AddDays(-((int)first.DayOfWeek + 6) % 7);
+        if (start > DateTime.MaxValue.Date.AddDays(-41)) start = DateTime.MaxValue.Date.AddDays(-41);
         return Enumerable.Range(0, 42).Select(i => { var date = start.AddDays(i); return new CalendarDay(date, date.Month == month.Month && date.Year == month.Year); }).ToArray();
     }
     public static string LunarText(DateTime date)

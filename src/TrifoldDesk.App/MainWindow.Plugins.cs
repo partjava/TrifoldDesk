@@ -10,6 +10,7 @@ public partial class MainWindow
     private readonly Dictionary<string, DashboardWidget> _dashboards = [];
     private bool _buildingWidgets;
     private bool _widgetLayoutReady;
+    private ContentControl? _managementHost;
     private bool HasPlugin(string id) => _widgets.Items.Any(i => i.PluginId == id);
     private static void Detach(FrameworkElement element)
     {
@@ -27,15 +28,13 @@ public partial class MainWindow
         var loaded = _config.Load<WidgetConfig>("widgets.json"); bool hasLayout = File.Exists(Path.Combine(App.DataDirectory, "widgets.json"));
         _widgets = hasLayout ? PluginRules.Normalize(loaded.Value) : PluginRules.Defaults(legacy);
         var folderLoad = _config.Load<FolderConfig>("folders.json"); _folders = folderLoad.Value;
-        _folders.Items ??= []; foreach (var folder in _folders.Items) folder.Items ??= [];
+        _folders.Items ??= []; foreach (var folder in _folders.Items) { folder.Items ??= []; folder.Slots ??= new(); }
         _folders.DesktopEntries ??= [];
         if (loaded.Warning != null) _loadWarning += "\n" + loaded.Warning;
         if (folderLoad.Warning != null) _loadWarning += "\n" + folderLoad.Warning;
         InitializeMonitorLayouts();
         MigrateLegacyWidgets();
         InitializeDesktopDrop();
-        if (loaded.Warning != null) _loadWarning += "\n" + loaded.Warning;
-        if (folderLoad.Warning != null) _loadWarning += "\n" + folderLoad.Warning;
         if (!hasLayout) { try { _config.Save("widgets.json", _widgets); } catch (Exception ex) { App.Log(ex); _loadWarning += "\n默认插件布局未保存。"; } }
         foreach (var (id, element) in new (string, FrameworkElement)[] { ("apps", AppsLibraryPanel), ("projects", ProjectsLibraryPanel), ("cpu", CpuWidget), ("memory", MemoryWidget), ("network", NetworkWidget), ("controls", ControlsContent) })
         { Detach(element); element.Margin = new Thickness(0); _widgetContents[id] = element; }
@@ -51,9 +50,12 @@ public partial class MainWindow
         if (_dialogOpen) return; _dialogOpen = true;
         try
         {
+            _managementHost ??= ManagementContent.Parent as ContentControl;
             Detach(ManagementContent);
             var dialog = new Window { Owner = this, Title = "全部入口管理", Width = 650, Height = 760, MaxHeight = SystemParameters.WorkArea.Height, Background = new SolidColorBrush(Color.FromRgb(22, 36, 48)), WindowStartupLocation = WindowStartupLocation.CenterOwner, DataContext = _viewModel, Content = ManagementContent };
-            ManagementContent.Margin = new Thickness(24); dialog.ShowDialog(); dialog.Content = null;
+            ManagementContent.Margin = new Thickness(24);
+            try { dialog.ShowDialog(); }
+            finally { dialog.Content = null; ManagementContent.Margin = new Thickness(0); if (_managementHost != null) _managementHost.Content = ManagementContent; }
         }
         finally { _dialogOpen = false; _leftAt = DateTime.UtcNow; }
     }
@@ -74,11 +76,15 @@ public partial class MainWindow
         try
         {
             var next = PluginRules.Clone(_widgets); int index = next.Items.FindIndex(i => i.InstanceId == frame.InstanceId); if (index < 0) return false;
-            if(!App.IsSelfTest && _frames.TryGetValue(frame.InstanceId,out var moved))
+            var previous = _widgets.Items[index];
+            bool geometryChanged = Math.Abs(frame.X - previous.X) > 0.5 || Math.Abs(frame.Y - previous.Y) > 0.5 || Math.Abs(frame.Width - previous.Width) > 0.5 || Math.Abs(frame.Height - previous.Height) > 0.5 || frame.PaneIndex != previous.PaneIndex || (previous.IsCollapsed && !frame.IsCollapsed);
+            if(!App.IsSelfTest && geometryChanged && _frames.TryGetValue(frame.InstanceId,out var moved))
             {
                 double paneWidth=WidgetCanvas.ActualWidth/3,left=frame.PaneIndex*paneWidth;
-                var requested=new WidgetBounds(frame.X-left,frame.Y,moved.ActualWidth,moved.ActualHeight);
-                var occupied=_frames.Values.Where(f=>f.Model.InstanceId!=frame.InstanceId && f.Model.PaneIndex==frame.PaneIndex).Select(f=>new WidgetBounds(f.Model.X-left,f.Model.Y,f.ActualWidth,f.ActualHeight));
+                double reqWidth=!double.IsNaN(moved.Width)&&moved.Width>0?moved.Width:(moved.ActualWidth>0?moved.ActualWidth:frame.Width);
+                double reqHeight=!double.IsNaN(moved.Height)&&moved.Height>0?moved.Height:(moved.ActualHeight>0?moved.ActualHeight:frame.Height);
+                var requested=new WidgetBounds(frame.X-left,frame.Y,reqWidth,reqHeight);
+                var occupied=_frames.Values.Where(f=>f.Model.InstanceId!=frame.InstanceId && f.Model.PaneIndex==frame.PaneIndex).Select(f=>new WidgetBounds(f.Model.X-left,f.Model.Y,f.ActualWidth>0?f.ActualWidth:(!double.IsNaN(f.Width)&&f.Width>0?f.Width:f.Model.Width),f.ActualHeight>0?f.ActualHeight:(!double.IsNaN(f.Height)&&f.Height>0?f.Height:f.Model.Height)));
                 var free=WidgetPlacement.Avoid(requested,occupied,paneWidth,WidgetCanvas.ActualHeight);
                 if(free.HasValue){frame.X=free.Value.X+left;frame.Y=free.Value.Y;Canvas.SetLeft(moved,frame.X);Canvas.SetTop(moved,frame.Y);}
                 else{_viewModel.Status="当前页面没有足够空位，保留原位置。";return false;}
@@ -143,13 +149,13 @@ public partial class MainWindow
                 if(body is ScrollViewer {Content: CalendarWidget dateCalendar})
                 {
                     var addDate=new MenuItem{Header="添加日期"};addDate.Click+=(_,_)=>dateCalendar.AddDateCounter();frame.ContextMenu!.Items.Add(addDate);
-                    var agenda=new MenuItem{Header="日程 / 周历…"};agenda.Click+=(_,_)=>new AgendaWindow(_config){Owner=this}.ShowDialog();frame.ContextMenu.Items.Add(agenda);
+                    var agenda=new MenuItem{Header="日程 / 周历…"};agenda.Click+=(_,_)=>{_dialogOpen=true;try{new AgendaWindow(_config){Owner=this}.ShowDialog();}finally{_dialogOpen=false;_leftAt=DateTime.UtcNow;}};frame.ContextMenu.Items.Add(agenda);
                     dateCalendar.ContextMenu=frame.ContextMenu;
                 }
                 if (item.PluginId is "apps" or "projects") AttachLibraryDrop(frame, item.PluginId == "apps" ? 0 : 1);
                 if (item.PluginId == "system-summary")
                 {
-                    var sensors=new MenuItem{Header="温度 / 风扇 / 显存…"};sensors.Click+=(_,_)=>new HardwareDetailsWindow{Owner=this}.ShowDialog();frame.ContextMenu.Items.Add(sensors);
+                    var sensors=new MenuItem{Header="温度 / 风扇 / 显存…"};sensors.Click+=(_,_)=>{_dialogOpen=true;try{new HardwareDetailsWindow{Owner=this}.ShowDialog();}finally{_dialogOpen=false;_leftAt=DateTime.UtcNow;}};frame.ContextMenu.Items.Add(sensors);
                     var choices = new MenuItem { Header = "显示内容" }; frame.ContextMenu.Items.Insert(0, choices);
                     foreach (var module in SummaryRules.Available)
                     {
@@ -173,7 +179,7 @@ public partial class MainWindow
             if (WidgetCanvas.ActualWidth > 1 && WidgetCanvas.ActualHeight > 1)
             {
                 var initialized = new WidgetConfig { Items = _frames.Values.Select(f => PluginRules.Clone(new WidgetConfig { Items = [f.Model] }).Items[0]).ToList() };
-                try { if (System.Text.Json.JsonSerializer.Serialize(initialized) != System.Text.Json.JsonSerializer.Serialize(_widgets)) _config.Save("widgets.json", initialized); _widgets = initialized; }
+                try { if (System.Text.Json.JsonSerializer.Serialize(initialized) != System.Text.Json.JsonSerializer.Serialize(_widgets)) PersistWidgetLayout(initialized); _widgets = initialized; }
                 catch (Exception ex) { App.Log(ex); _viewModel.Status = "默认布局尚未保存。"; }
             }
         }
@@ -182,15 +188,36 @@ public partial class MainWindow
     private void AttachLibraryDrop(WidgetFrame frame, int screen)
     {
         frame.AllowDrop = true;
-        frame.DragOver += (_, e) => { e.Effects = e.Data.GetDataPresent(FolderWidget.DragFormat) ? DragDropEffects.Move : e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Link : DragDropEffects.None; e.Handled = true; };
-        frame.Drop += (_, e) => { if (e.Data.GetData(FolderWidget.DragFormat) is FolderDrag source) ExportFolderEntry(source.FolderId, source.ItemId, screen); else if (e.Data.GetData(DataFormats.FileDrop) is string[] paths) AddPaths(paths, screen); e.Handled = true; };
+        frame.DragOver += (_, e) => { e.Effects = e.Data.GetDataPresent(FolderWidget.DragFormat) ? (System.Windows.Input.Keyboard.Modifiers.HasFlag(System.Windows.Input.ModifierKeys.Control) ? DragDropEffects.Copy : DragDropEffects.Move) : e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Link : DragDropEffects.None; e.Handled = true; };
+        frame.Drop += (_, e) =>
+        {
+            if (e.Data.GetData(FolderWidget.DragFormat) is FolderDrag source)
+            {
+                if (source.MappedItem != null) AddPaths([source.MappedItem.SourcePath], screen);
+                else if (source.Desktop) ExportDesktopEntryToLibrary(source.ItemId, screen, System.Windows.Input.Keyboard.Modifiers.HasFlag(System.Windows.Input.ModifierKeys.Control));
+                else ExportFolderEntry(source.FolderId, source.ItemId, screen);
+            }
+            else if (e.Data.GetData(DataFormats.FileDrop) is string[] paths) AddPaths(paths, screen);
+            e.Handled = true;
+        };
     }
     private FolderData ReadFolder(string id) => _folders.Items.FirstOrDefault(f => f.Id == id) ?? new FolderData { Id = id };
     private bool SaveCalendarDates(string id,List<DateCounter> dates)
     {
         var next=PluginRules.Clone(_widgets);var item=next.Items.FirstOrDefault(w=>w.InstanceId==id);if(item==null)return false;
         item.Dates=dates;item.Height=340+dates.Count*34;
-        return SaveWidgetConfig(next);
+        try
+        {
+            var clean=PluginRules.Normalize(next);PersistWidgetLayout(clean);_widgets=clean;
+            if(_frames.TryGetValue(id,out var frame))
+            {
+                var updated=clean.Items.First(w=>w.InstanceId==id);
+                frame.Model.Dates=updated.Dates;frame.Model.Height=updated.Height;frame.Constrain(false);
+            }
+            foreach(var calendar in _calendars)calendar.ChangeMonth(0);
+            return true;
+        }
+        catch(Exception ex){Fail("插件配置未保存，桌面保持原布局",ex);return false;}
     }
     private void ImportLibraryEntry(string target, LibraryDrag source, bool copy)
     {
@@ -239,17 +266,43 @@ public partial class MainWindow
         next.Items.RemoveAll(f=>f.Id==staging.Id);SaveFolders(next);
     }
     private void RemoveFolderEntry(string id, string entry)
-    { var next = FolderRules.Clone(_folders); next.Items.FirstOrDefault(f => f.Id == id)?.Items.RemoveAll(i => i.Id == entry); SaveFolders(next); }
+    {
+        var next = FolderRules.Clone(_folders);
+        var folder = next.Items.FirstOrDefault(f => f.Id == id);
+        var removed = folder?.Items.FirstOrDefault(i => i.Id == entry);
+        folder?.Items.RemoveAll(i => i.Id == entry);
+        folder?.Slots.Remove(entry);
+        if (removed != null && !string.IsNullOrEmpty(removed.ChildFolderId))
+        {
+            var child = next.Items.FirstOrDefault(f => f.Id == removed.ChildFolderId);
+            if (child != null) child.ParentFolderId = "";
+        }
+        SaveFolders(next);
+    }
+    private void ExportDesktopEntryToLibrary(string itemId, int screen, bool copy)
+    {
+        var desktop = _folders.DesktopEntries.FirstOrDefault(d => d.Item.Id == itemId); if (desktop == null) return;
+        if (!string.IsNullOrEmpty(desktop.Item.ChildFolderId)) { _viewModel.Status = "嵌套文件夹不能直接移入列表库。"; return; }
+        if (!Collection(screen).Any(v => v.Item.SourcePath.Equals(desktop.Item.SourcePath, StringComparison.OrdinalIgnoreCase)))
+        {
+            var cloned = System.Text.Json.JsonSerializer.Deserialize<ShortcutItem>(System.Text.Json.JsonSerializer.Serialize(desktop.Item))!; cloned.Id = Guid.NewGuid().ToString("N"); cloned.ScreenIndex = screen;
+            var view = new ShortcutViewModel(cloned); Collection(screen).Add(view);
+            if (!SaveShortcuts()) { Collection(screen).Remove(view); _viewModel.RebuildLibrary(); return; }
+        }
+        if (!copy) { var next = FolderRules.Clone(_folders); next.DesktopEntries.RemoveAll(d => d.Item.Id == itemId); SaveFolders(next); }
+    }
     private void ExportFolderEntry(string folder, string entry, int screen)
     {
         var item = ReadFolder(folder).Items.FirstOrDefault(i => i.Id == entry); if (item == null) return;
+        if (!string.IsNullOrEmpty(item.ChildFolderId)) { _viewModel.Status = "嵌套文件夹不能直接移入列表库。"; return; }
         if (!Collection(screen).Any(v => v.Item.SourcePath.Equals(item.SourcePath, StringComparison.OrdinalIgnoreCase)))
         {
             var cloned = System.Text.Json.JsonSerializer.Deserialize<ShortcutItem>(System.Text.Json.JsonSerializer.Serialize(item))!; cloned.Id = Guid.NewGuid().ToString("N"); cloned.ScreenIndex = screen;
             var view = new ShortcutViewModel(cloned); Collection(screen).Add(view);
             if (!SaveShortcuts()) { Collection(screen).Remove(view); _viewModel.RebuildLibrary(); return; }
         }
-        RemoveFolderEntry(folder, entry);
+        if (!System.Windows.Input.Keyboard.Modifiers.HasFlag(System.Windows.Input.ModifierKeys.Control))
+            RemoveFolderEntry(folder, entry);
     }
     internal void TestApplyWidgets(WidgetConfig value) { if (!SaveWidgetConfig(value)) throw new IOException("Widget test save failed."); }
     internal void TestRemoveWidget(string id) => RemoveWidget(id);

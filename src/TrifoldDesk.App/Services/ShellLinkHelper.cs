@@ -157,7 +157,7 @@ public static class ShellLinkHelper
             IntPtr pidl = IntPtr.Zero; var info = new SHFILEINFO(); ImageSource? image = null;
             try
             {
-                if (SHParseDisplayName(ShellAppPath(path), IntPtr.Zero, out pidl, 0, out _) != 0) return null;
+                if (SHParseDisplayName(ShellAppPath(path), IntPtr.Zero, out pidl, 0, out _) != 0) { Cache(key, null); return null; }
                 image = ShellImage(pidl, pixels);
                 if (image == null)
                 {

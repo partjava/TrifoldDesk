@@ -14,6 +14,7 @@ public sealed class WidgetFrame : Border
     private double _resizeDx, _resizeDy;
     private bool _resizeLeft, _resizeTop;
     private readonly Button _fold = new(), _lock = new();
+    private readonly Grid _grid = new();
     private readonly TextBlock _title = new();
     private MenuItem? _auto;
     private StackPanel? _actions;
@@ -53,14 +54,14 @@ public sealed class WidgetFrame : Border
         else Background = Brushes.Transparent; ClipToBounds = true;
         if (model.PluginId == "folder") CornerRadius = new CornerRadius(10);
         bool folderFrame = model.PluginId == "folder";
-        var grid = new Grid(); grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(folderFrame ? 4 : model.PluginId == "clock" ? 12 : 36) }); grid.RowDefinitions.Add(new RowDefinition()); Child = grid;
+        var grid = _grid; grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(folderFrame ? 4 : (model.PluginId == "clock" && !model.IsCollapsed) ? 12 : 36) }); grid.RowDefinitions.Add(new RowDefinition()); Child = grid;
         var header = new Grid { Margin = new Thickness(12, 0, 10, 0) }; grid.Children.Add(header);
         _move.Cursor = Cursors.SizeAll; _move.Background = Brushes.Transparent;
         var transparent = new FrameworkElementFactory(typeof(Border)); transparent.SetValue(Border.BackgroundProperty, Brushes.Transparent);
         _move.Template = new ControlTemplate(typeof(Thumb)) { VisualTree = transparent }; header.Children.Add(_move);
         _title.TextTrimming = TextTrimming.CharacterEllipsis; _title.FontSize = 11; _title.FontWeight = FontWeights.SemiBold;
         if (themed && model.Style == "paper") _title.Foreground = new SolidColorBrush(Color.FromRgb(48, 72, 76));
-        _title.VerticalAlignment = VerticalAlignment.Center; _title.Margin = new Thickness(0, 0, 112, 0); _title.IsHitTestVisible = false; header.Children.Add(_title);
+        _title.VerticalAlignment = VerticalAlignment.Center; _title.Margin = new Thickness(0, 0, 8, 0); _title.IsHitTestVisible = false; header.Children.Add(_title);
         if (folderFrame) { _title.Visibility = Visibility.Collapsed; ToolTip = model.Title; }
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center }; header.Children.Add(actions);
         _actions = actions;
@@ -88,14 +89,15 @@ public sealed class WidgetFrame : Border
         _move.DragDelta += (_, e) => Move(e.HorizontalChange, e.VerticalChange);
         _resize.DragDelta += (_, e) => Resize(e.HorizontalChange, e.VerticalChange);
         _move.DragCompleted += EndGesture; _resize.DragCompleted += EndGesture;
-        var menu = new ContextMenu(); ContextMenu = menu;
-        var lockEntry = new MenuItem { Header="锁定位置", IsCheckable=true }; menu.Items.Add(lockEntry); lockEntry.Click+=(_,_)=>ChangeState(()=>Model.IsLocked=!Model.IsLocked);
-        var foldEntry = new MenuItem(); menu.Items.Add(foldEntry); foldEntry.Click+=(_,_)=>ToggleCollapsed();
+        var menu = body is FolderWidget && body.ContextMenu is ContextMenu existingMenu ? existingMenu : new ContextMenu(); ContextMenu = menu;
+        var lockEntry = new MenuItem { Header="锁定位置", IsCheckable=true }; lockEntry.Click+=(_,_)=>ChangeState(()=>Model.IsLocked=!Model.IsLocked);
+        var foldEntry = new MenuItem(); foldEntry.Click+=(_,_)=>ToggleCollapsed();
+        if (ReferenceEquals(menu, body.ContextMenu)) { menu.Items.Insert(0, lockEntry); menu.Items.Insert(1, foldEntry); }
+        else { menu.Items.Add(lockEntry); menu.Items.Add(foldEntry); }
         menu.Opened+=(_,_)=>{lockEntry.IsChecked=Model.IsLocked;foldEntry.Header=Model.IsCollapsed?"展开":"收起";};
-        if (body is FolderWidget && body.ContextMenu is ContextMenu folderMenu)
+        if (body is FolderWidget)
         {
-            while (folderMenu.Items.Count > 0) { var entry=folderMenu.Items[0]; folderMenu.Items.RemoveAt(0); menu.Items.Add(entry); }
-            body.ContextMenu=menu;
+            body.ContextMenu = menu;
             var fit = new MenuItem { Header="边框贴合内容", IsCheckable=true }; menu.Items.Add(fit);
             fit.Click+=(_,_)=>ChangeState(()=>Model.FolderAutoHeight=fit.IsChecked);
             menu.Opened+=(_,_)=>fit.IsChecked=Model.FolderAutoHeight;
@@ -192,11 +194,14 @@ public sealed class WidgetFrame : Border
     }
     private void UpdateState()
     {
-        _title.Visibility = Model.PluginId is "clock" or "folder" ? Visibility.Collapsed : Visibility.Visible; _title.Text = string.IsNullOrWhiteSpace(Model.Title) ? PluginRules.Catalog.First(p => p.Id == Model.PluginId).Name : Model.Title;
+        bool folderFrame = Model.PluginId == "folder";
+        _title.Visibility = folderFrame || (Model.PluginId == "clock" && !Model.IsCollapsed) ? Visibility.Collapsed : Visibility.Visible;
+        if (_grid.RowDefinitions.Count > 0) _grid.RowDefinitions[0].Height = new GridLength(folderFrame ? 4 : (Model.PluginId == "clock" && !Model.IsCollapsed) ? 12 : 36);
+        _title.Text = string.IsNullOrWhiteSpace(Model.Title) ? PluginRules.Catalog.First(p => p.Id == Model.PluginId).Name : Model.Title;
         if (_body is FolderWidget) ToolTip=_title.Text;
         _fold.Content = Model.IsCollapsed ? "展开" : "收起"; _lock.Content = Model.IsLocked ? "锁定" : "自由";
         bool phone = Model.IsCollapsed && _body is FolderWidget;
-        _title.Margin = new Thickness(0,0,phone ? 34 : 112,0); _lock.Visibility = phone ? Visibility.Collapsed : Visibility.Visible;
+        _title.Margin = new Thickness(0,0,phone ? 34 : 8,0); _lock.Visibility = phone ? Visibility.Collapsed : Visibility.Visible;
         if (phone) _fold.Content = "↗";
         if (_actions != null) _actions.Opacity = Model.IsCollapsed || IsMouseOver ? 1 : 0;
         _resize.Opacity = IsMouseOver ? 1 : 0;

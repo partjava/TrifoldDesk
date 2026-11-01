@@ -30,6 +30,7 @@ public static class RenderBudget
     public static bool CanDraw(FrameworkElement element)
     {
         if(DateTime.UtcNow>=_nextPolicy){Visibility.Clear();_nextPolicy=DateTime.UtcNow.AddMilliseconds(500);}
+        else if(Visibility.Count>64){foreach(var k in Visibility.Keys.Where(k=>!k.IsLoaded).ToArray())Visibility.Remove(k);}
         if(!element.IsLoaded || !element.IsVisible || element.ActualWidth<=0 || element.ActualHeight<=0)return false;
         if(Visibility.TryGetValue(element,out var visible) && DateTime.UtcNow<_nextPolicy)return visible;
         visible=EvaluateVisibility(element); Visibility[element]=visible; return visible;
@@ -47,19 +48,32 @@ public static class RenderBudget
                 }
             var topLeft=element.PointToScreen(new Point()); var bottomRight=element.PointToScreen(new Point(element.ActualWidth,element.ActualHeight));
             var hwnd=new WindowInteropHelper(window).Handle;
-            for(var above=GetWindow(hwnd,3);above!=IntPtr.Zero;above=GetWindow(above,3))
+            var host=GetParent(hwnd);
+            if(host!=IntPtr.Zero)
             {
-                if(!IsWindowVisible(above)||IsIconic(above))continue;
-                if(DwmGetWindowAttribute(above,14,out int cloaked,sizeof(int))==0 && cloaked!=0)continue;
-                // Layered windows can be transparent; do not mistake them for opaque covers.
-                if((GetWindowLong(above,-20)&0x80000)!=0)continue;
-                if(GetWindowRect(above,out var rect) && rect.Left<=topLeft.X && rect.Top<=topLeft.Y && rect.Right>=bottomRight.X && rect.Bottom>=bottomRight.Y)return false;
+                for(var above=GetTopWindow(IntPtr.Zero);above!=IntPtr.Zero&&above!=host&&above!=hwnd;above=GetWindow(above,2))
+                    if(Covers(above,topLeft,bottomRight))return false;
+            }
+            else
+            {
+                for(var above=GetWindow(hwnd,3);above!=IntPtr.Zero;above=GetWindow(above,3))
+                    if(Covers(above,topLeft,bottomRight))return false;
             }
             return true;
         }
         catch(InvalidOperationException){return false;}
     }
+    private static bool Covers(IntPtr above,Point topLeft,Point bottomRight)
+    {
+        if(!IsWindowVisible(above)||IsIconic(above))return false;
+        if(DwmGetWindowAttribute(above,14,out int cloaked,sizeof(int))==0 && cloaked!=0)return false;
+        // Layered windows can be transparent; do not mistake them for opaque covers.
+        if((GetWindowLong(above,-20)&0x80000)!=0)return false;
+        return GetWindowRect(above,out var rect) && rect.Left<=topLeft.X && rect.Top<=topLeft.Y && rect.Right>=bottomRight.X && rect.Bottom>=bottomRight.Y;
+    }
     [StructLayout(LayoutKind.Sequential)] private struct NativeRect {public int Left,Top,Right,Bottom;}
+    [DllImport("user32.dll")] private static extern IntPtr GetParent(IntPtr hwnd);
+    [DllImport("user32.dll")] private static extern IntPtr GetTopWindow(IntPtr hwnd);
     [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr hwnd,uint command);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hwnd);
     [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hwnd);

@@ -39,6 +39,7 @@ public sealed class DashboardWidget : Grid
     private GpuMonitorService? _gpu;
     private bool _busy, _active, _wasDrawable;
     private int _generation;
+    private long _lastPlotTick;
     private readonly Brush _ink, _muted, _accent;
     public DashboardWidget(string kind, string style, MainViewModel model, bool compact = false)
     {
@@ -62,7 +63,7 @@ public sealed class DashboardWidget : Grid
         }
         _timer.Interval = TimeSpan.FromSeconds(kind == "gpu" ? 5 : kind == "battery" ? 10 : kind == "clock" ? 1 : 2); _timer.Tick += Tick;
         Loaded += (_, _) => { _active = true; _generation++; _timer.Start(); Tick(this, EventArgs.Empty); };
-        Unloaded += (_, _) => { _active = false; _generation++; _timer.Stop(); var old = _gpu; _gpu = null; if (old != null) _ = Task.Run(old.Dispose); };
+        Unloaded += (_, _) => { _active = false; _busy = false; _generation++; _timer.Stop(); var old = _gpu; _gpu = null; if (old != null) _ = Task.Run(old.Dispose); };
         IsVisibleChanged += (_, _) => { if (_active && IsVisible) { _timer.Start(); Tick(this, EventArgs.Empty); } else _timer.Stop(); };
         Tick(this, EventArgs.Empty);
         if(kind is "cpu" or "gpu") Loaded+=async (_,_)=>{ _hardware=await HardwareInfoService.ReadAsync(); if(_active) Tick(this,EventArgs.Empty); };
@@ -72,21 +73,28 @@ public sealed class DashboardWidget : Grid
             _detail.Margin = new Thickness(0, 0, 0, 4); _detail.FontSize = 10; _detail.TextWrapping=TextWrapping.NoWrap; _detail.TextTrimming=TextTrimming.CharacterEllipsis;
             _plot.MinHeight = 12; _plot.Margin = new Thickness(0, 0, 0, 3);
             _extra.FontSize = 9; _extra.Margin = new Thickness(0); _extra.Visibility = Visibility.Collapsed;
-            SizeChanged += (_, _) => _extra.Visibility = ActualHeight >= 140 ? Visibility.Visible : Visibility.Collapsed;
+            SizeChanged += (_, _) => _extra.Visibility = ActualHeight >= 105 ? Visibility.Visible : Visibility.Collapsed;
             if (kind == "network") _detail.Text = _model.UploadText;
         }
     }
     private static Brush Brush(string color) => new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
     internal static string BatteryValue(int status, float fraction) => status == 255 ? "不可用" : (status & 128) != 0 ? "交流电" : !float.IsFinite(fraction) || fraction is < 0 or > 1 ? "不可用" : $"{fraction * 100:0}%";
+    private void SamplePlot(double value, double? secondary = null)
+    {
+        long now = Environment.TickCount64;
+        if (_lastPlotTick != 0 && now - _lastPlotTick < 900) return;
+        _lastPlotTick = now;
+        _plot.Add(value, secondary);
+    }
     private async void Tick(object? sender, EventArgs e)
     {
         if (_busy) return;
         bool drawable=RenderBudget.CanDraw(this); if(drawable && !_wasDrawable){_plot.InvalidateVisual();_gauge.InvalidateVisual();_analog?.InvalidateVisual();} _wasDrawable=drawable;
         switch (_kind)
         {
-            case "cpu": _value.Text = _model.CpuText; _detail.Text = _hardware?.Cpu ?? "读取处理器型号…"; _detail.ToolTip=_detail.Text; _extra.Text = "最近60次采样"; if (_model.CpuText.EndsWith('%')) _plot.Add(_model.CpuValue); UtilizationUpdated?.Invoke(_model.CpuText.EndsWith('%') ? _model.CpuValue : null); break;
+            case "cpu": _value.Text = _model.CpuText; _detail.Text = _hardware?.Cpu ?? "读取处理器型号…"; _detail.ToolTip=_detail.Text; _extra.Text = "最近60次采样"; if (_model.CpuText.EndsWith('%')) SamplePlot(_model.CpuValue); UtilizationUpdated?.Invoke(_model.CpuText.EndsWith('%') ? _model.CpuValue : null); break;
             case "memory": _value.Text = _model.MemoryPercent; _detail.Text = _model.MemoryText; _extra.Text = "物理内存"; UtilizationUpdated?.Invoke(_model.MemoryPercent.EndsWith('%' ) ? _model.MemoryValue : null); _gauge.UpdateValue(_model.MemoryValue); break;
-            case "network": _value.Text = _model.DownloadText; _detail.Text = _compact ? _model.UploadText : _model.NetworkName; _detail.ToolTip=_model.NetworkName+" · 亮线下载，暗线上传，共用刻度"; _extra.Text = _model.UploadText + "  上传"; if (_model.DownloadRate is double rate) _plot.Add(rate,_model.UploadRate); break;
+            case "network": _value.Text = _model.DownloadText; _detail.Text = _compact ? _model.UploadText : _model.NetworkName; _detail.ToolTip=_model.NetworkName+" · 亮线下载，暗线上传，共用刻度"; _extra.Text = _model.UploadText + "  上传"; if (_model.DownloadRate is double rate) SamplePlot(rate,_model.UploadRate); break;
             case "clock": _value.Text = DateTime.Now.ToString("HH:mm"); _detail.Text = DateTime.Now.ToString("MM月dd日  dddd"); _extra.Text = CalendarMonth.LunarText(DateTime.Today); if(_analog!=null && RenderBudget.CanDraw(_analog))_analog.InvalidateVisual(); break;
             case "battery":
                 var power = System.Windows.Forms.SystemInformation.PowerStatus;
@@ -97,7 +105,7 @@ public sealed class DashboardWidget : Grid
             case "gpu":
                 if (!_active) { _value.Text = "—"; _detail.Text = "GPU · 3D引擎"; _extra.Text = "等待组件启动"; break; }
                 _busy = true; int generation = _generation; var provider = _gpu ??= new GpuMonitorService();
-                try { var selected=(Application.Current.MainWindow as MainWindow)?.SelectedGpuId??""; var result = await Task.Run(()=>provider.Read(selected)); if (!_active || generation != _generation) return; _value.Text = result.Value is double v ? $"{v:0}%" : "—"; _detail.Text = string.IsNullOrEmpty(result.AdapterName)?(_hardware?.Gpu??"显卡不可用"):result.AdapterName.Replace("NVIDIA GeForce ",""); _detail.ToolTip=_detail.Text+"\n"+result.Status; _extra.Text = result.DedicatedMemoryUsedBytes is double memory?$"显存 {memory/1073741824d:0.0} / {(result.DedicatedMemoryTotalBytes??0)/1073741824d:0.0} GB":result.Status; UtilizationUpdated?.Invoke(result.Value); if (result.Value is double sample) _plot.Add(sample); }
+                try { var selected=(Application.Current.MainWindow as MainWindow)?.SelectedGpuId??""; var result = await Task.Run(()=>provider.Read(selected)); if (!_active || generation != _generation) return; _value.Text = result.Value is double v ? $"{v:0}%" : "—"; _detail.Text = string.IsNullOrEmpty(result.AdapterName)?(_hardware?.Gpu??"显卡不可用"):result.AdapterName.Replace("NVIDIA GeForce ",""); _detail.ToolTip=_detail.Text+"\n"+result.Status; _extra.Text = result.DedicatedMemoryUsedBytes is double memory?$"显存 {memory/1073741824d:0.0} / {(result.DedicatedMemoryTotalBytes??0)/1073741824d:0.0} GB":result.Status; UtilizationUpdated?.Invoke(result.Value); if (result.Value is double sample) SamplePlot(sample); }
                 finally { _busy = false; } break;
         }
     }
