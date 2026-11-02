@@ -121,13 +121,14 @@ public partial class MainWindow
                 else if (item.PluginId == "weather")body=new WeatherWidget(item.InstanceId,_config);
                 else if (item.PluginId == "music")body=new MusicWidget(item.InstanceId,_config);
                 else if (item.PluginId == "project-browser")body=new ProjectBrowserWidget(item.InstanceId,_config);
+                else if (item.PluginId == "photo-line")body=new PhotoClotheslineWidget(item.InstanceId,_config,item.Style);
                 else if (item.PluginId == "system-summary") body = new CombinedStatusWidget(item, _viewModel);
                 else body = _widgetContents[item.PluginId];
                 body.Visibility = Visibility.Visible; body.DataContext = _viewModel;
                 if (item.X < 0 || item.Y < 0 || item.Width <= 0 || item.Height <= 0)
                 {
                     item.X = item.PaneIndex * pane + 8; item.Y = 8; item.Width = Math.Max(200, pane - 20); item.Height = Math.Max(120, h - 16);
-                    if(item.PluginId is "workbench" or "weather" or "music" or "project-browser"){item.Width=Math.Min(350,pane-20);item.Height=270;}
+                    if(item.PluginId is "workbench" or "weather" or "music" or "project-browser" or "photo-line"){item.Width=Math.Min(360,pane-20);item.Height=item.PluginId=="photo-line"?230:270;}
                     switch (item.PluginId)
                     {
                         case "calendar": item.Width = Math.Min(350, pane - 20); item.Height = 340; item.Y = 8 + calendarNumber++ * 40; if (HasPlugin("disks")) { item.Y = h - 116; item.IsCollapsed = true; } break;

@@ -21,12 +21,20 @@ public sealed class CombinedStatusWidget : ScrollViewer
                 void RefreshDisks()
                 {
                     entries.Children.Clear();
+                    bool darkText = TextContrast.IsDarkTextStyle(instance.Style);
                     foreach(var drive in model.Drives.Where(d=>d.Kind=="本地磁盘"))
                     {
-                        entries.Children.Add(new TextBlock { Text=drive.Name.TrimEnd('\\')+"  "+(drive.FreeBytes is long free && drive.TotalBytes is long total?$"余 {free/1073741824d:0.#} / {total/1073741824d:0.#} GB":"不可用"),FontSize=10,Foreground=instance.Style=="paper"?Brushes.DarkSlateGray:Brushes.WhiteSmoke,Margin=new Thickness(0,0,0,4),TextTrimming=TextTrimming.CharacterEllipsis,ToolTip=drive.CapacityText+" · 进度条表示已用容量" });
+                        var label = new TextBlock { Text=drive.Name.TrimEnd('\\')+"  "+(drive.FreeBytes is long free && drive.TotalBytes is long total?$"余 {free/1073741824d:0.#} / {total/1073741824d:0.#} GB":"不可用"),FontSize=10,Foreground=darkText?Brushes.DarkSlateGray:Brushes.WhiteSmoke,Margin=new Thickness(0,0,0,4),TextTrimming=TextTrimming.CharacterEllipsis,ToolTip=drive.CapacityText+" · 进度条表示已用容量" };
+                        if (instance.Style == "glass") label.Effect = TextContrast.Shadow;
+                        entries.Children.Add(label);
                         entries.Children.Add(new ProgressBar { Value=drive.UsedPercent,Maximum=100,Height=5,Margin=new Thickness(0,0,0,10),Template=BarTemplate(),Foreground=drive.LowSpace?Brushes.OrangeRed:new LinearGradientBrush(Color.FromRgb(56,186,193),Color.FromRgb(116,225,209),0),Background=new SolidColorBrush(Color.FromArgb(40,190,200,205)) });
                     }
-                    if(entries.Children.Count==0)entries.Children.Add(new TextBlock { Text=model.Drives.Count>0?"无固定本地磁盘":"磁盘读取中…",FontSize=10,Foreground=instance.Style=="paper"?Brushes.DarkSlateGray:Brushes.WhiteSmoke });
+                    if(entries.Children.Count==0)
+                    {
+                        var empty = new TextBlock { Text=model.Drives.Count>0?"无固定本地磁盘":"磁盘读取中…",FontSize=10,Foreground=darkText?Brushes.DarkSlateGray:Brushes.WhiteSmoke };
+                        if (instance.Style == "glass") empty.Effect = TextContrast.Shadow;
+                        entries.Children.Add(empty);
+                    }
                 }
                 System.Collections.Specialized.NotifyCollectionChangedEventHandler changed=(_,_)=>RefreshDisks();
                 Loaded+=(_,_)=>{model.Drives.CollectionChanged+=changed;RefreshDisks();};
@@ -46,9 +54,11 @@ public sealed class CombinedStatusWidget : ScrollViewer
     private static Grid Header(string id,string label,string style)
     {
         var grid=new Grid{Margin=new Thickness(0,0,0,4)};
-        grid.Children.Add(new TextBlock{Text=label,FontSize=11,Foreground=new SolidColorBrush((Color)ColorConverter.ConvertFromString(style=="paper"?"#587079":"#C0CDD3")),VerticalAlignment=VerticalAlignment.Center});
+        var text=new TextBlock{Text=label,FontSize=11,Foreground=new SolidColorBrush((Color)ColorConverter.ConvertFromString(TextContrast.IsDarkTextStyle(style)?"#48606A":"#C8D6DC")),VerticalAlignment=VerticalAlignment.Center};
+        if (style == "glass") text.Effect = TextContrast.Shadow;
+        grid.Children.Add(text);
         if(id is "cpu" or "memory" or "gpu") grid.Children.Add(new OrganicMetricRing { Width=28,Height=28,HorizontalAlignment=HorizontalAlignment.Right,Accent=new SolidColorBrush((Color)ColorConverter.ConvertFromString(style=="paper"?"#267E73":"#74E1D1")) });
-        else grid.Children.Add(new HardwareGlyph{Kind=id,Width=20,Height=20,HorizontalAlignment=HorizontalAlignment.Right,Ink=new SolidColorBrush((Color)ColorConverter.ConvertFromString(style=="paper"?"#267E73":"#74E1D1")),Opacity=.7,IsHitTestVisible=false});
+        else grid.Children.Add(new HardwareGlyph{Kind=id,Width=20,Height=20,HorizontalAlignment=HorizontalAlignment.Right,Ink=new SolidColorBrush((Color)ColorConverter.ConvertFromString(TextContrast.IsDarkTextStyle(style)?"#1E786E":"#74E1D1")),Opacity=.7,IsHitTestVisible=false});
         return grid;
     }
     private static ControlTemplate BarTemplate()

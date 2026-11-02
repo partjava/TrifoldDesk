@@ -153,3 +153,78 @@ public static class GitStatusRules
         return result;
     }
 }
+
+public sealed class HangingPhotoItem
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Title { get; set; } = "";
+    public string ImagePath { get; set; } = "";
+    public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+    public double TiltDegrees { get; set; }
+}
+public sealed class PhotoLineData
+{
+    public bool AutoWatchScreenshots { get; set; }
+    public List<HangingPhotoItem> Items { get; set; } = [];
+}
+public sealed class PhotoLineConfig
+{
+    public int SchemaVersion { get; set; } = 1;
+    public Dictionary<string, PhotoLineData> Widgets { get; set; } = [];
+}
+public static class PhotoLineRules
+{
+    public const int MaxPhotos = 24;
+    public static double DefaultTilt(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return -1.5;
+        int hash = 17;
+        foreach (char c in id) hash = unchecked(hash * 31 + c);
+        double normalized = (Math.Abs(hash % 1000) / 999.0) * 6.4 - 3.2;
+        return Math.Abs(normalized) < 0.6 ? (normalized < 0 ? -1.2 : 1.2) : Math.Round(normalized, 1);
+    }
+    public static PhotoLineData AddPhoto(PhotoLineData state, string imagePath, string? title = null, string? id = null)
+    {
+        if (string.IsNullOrWhiteSpace(imagePath)) throw new ArgumentException("截图路径不能为空。", nameof(imagePath));
+        var next = Clone(state); next.Items ??= [];
+        string itemId = string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString("N") : id.Trim();
+        if (next.Items.Any(i => i != null && i.Id == itemId)) throw new ArgumentException("截图标识重复。", nameof(id));
+        string label = string.IsNullOrWhiteSpace(title) ? DateTime.Now.ToString("HH:mm 截图") : title.Trim();
+        if (label.Length > 80) label = label[..80];
+        next.Items.Insert(0, new HangingPhotoItem
+        {
+            Id = itemId,
+            Title = label,
+            ImagePath = imagePath,
+            CreatedUtc = DateTime.UtcNow,
+            TiltDegrees = DefaultTilt(itemId)
+        });
+        while (next.Items.Count > MaxPhotos) next.Items.RemoveAt(next.Items.Count - 1);
+        return next;
+    }
+    public static PhotoLineData RemovePhoto(PhotoLineData state, string id)
+    {
+        var next = Clone(state); next.Items ??= [];
+        next.Items.RemoveAll(i => i == null || i.Id == id);
+        return next;
+    }
+    public static PhotoLineData RenamePhoto(PhotoLineData state, string id, string title)
+    {
+        var next = Clone(state); next.Items ??= [];
+        var item = next.Items.FirstOrDefault(i => i != null && i.Id == id);
+        if (item != null) item.Title = (title ?? "").Trim().Length > 80 ? title!.Trim()[..80] : (title ?? "").Trim();
+        return next;
+    }
+    public static PhotoLineData MovePhoto(PhotoLineData state, string sourceId, string targetId)
+    {
+        var next = Clone(state); next.Items ??= [];
+        int from = next.Items.FindIndex(i => i != null && i.Id == sourceId);
+        int to = next.Items.FindIndex(i => i != null && i.Id == targetId);
+        if (from < 0 || to < 0 || from == to) return next;
+        var item = next.Items[from];
+        next.Items.RemoveAt(from);
+        next.Items.Insert(to, item);
+        return next;
+    }
+    public static PhotoLineData Clone(PhotoLineData state) => JsonSerializer.Deserialize<PhotoLineData>(JsonSerializer.Serialize(state ?? new PhotoLineData()))!;
+}

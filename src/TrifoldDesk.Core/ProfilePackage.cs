@@ -29,7 +29,7 @@ public static class ProfilePackage
     private static readonly string[] GeneratedRoots = ["app-links", "icons", "assets", "resources"];
     private static readonly string[] AssetRoots = ["app-links", "icons", "assets", "resources", "plugins", "plugin-data"];
     private static readonly HashSet<string> PathProperties = new(StringComparer.Ordinal)
-        { "SourcePath", "TargetPath", "IconPath", "WorkingDirectory", "ExecutablePath", "DirectoryPath", "RootPath" };
+        { "SourcePath", "TargetPath", "IconPath", "WorkingDirectory", "ExecutablePath", "DirectoryPath", "RootPath", "ImagePath" };
 
     public static void Export(string profileDirectory, string archivePath)
     {

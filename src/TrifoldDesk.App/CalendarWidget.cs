@@ -7,6 +7,7 @@ public sealed class CalendarWidget : Border
     private readonly UniformGrid _days = new() { Columns = 7, Rows = 6, Height = 228 };
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromMinutes(1) };
     private readonly bool _paper;
+    private readonly bool _glass;
     private DateTime _today = DateTime.Today;
     private readonly StackPanel _counters=new();
     private readonly Func<IReadOnlyList<DateCounter>> _readDates;
@@ -16,7 +17,9 @@ public sealed class CalendarWidget : Border
     public CalendarWidget(string style,Func<IReadOnlyList<DateCounter>>? readDates=null,Func<List<DateCounter>,bool>? saveDates=null)
     {
         _readDates=readDates??(()=>Array.Empty<DateCounter>());_saveDates=saveDates??(_=>false);
-        _paper = style == "paper";
+        _paper = TextContrast.IsDarkTextStyle(style);
+        _glass = style == "glass";
+        if (_glass) _title.Effect = TextContrast.Shadow;
         Background = Brushes.Transparent; Padding = new Thickness(4); BorderThickness = new Thickness(0);
         var root = new StackPanel(); Child = root;
         var top = new Grid { Margin = new Thickness(0,0,0,12) };
@@ -33,7 +36,7 @@ public sealed class CalendarWidget : Border
         Loaded += (_, _) => { _today = DateTime.Today; Render(); _clock.Start(); }; Unloaded += (_, _) => _clock.Stop(); Render();
     }
     private static SolidColorBrush Fill(string color) => new((Color)ColorConverter.ConvertFromString(color));
-    private TextBlock Label(string text,double size,string color) => new() { Text=text,FontSize=size,Foreground=Fill(_paper && color != "#D28B91" ? "#554D3E" : color),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center };
+    private TextBlock Label(string text,double size,string color) => new() { Text=text,FontSize=size,Foreground=Fill(_paper && color != "#D28B91" ? "#30444C" : color),Effect=_glass?TextContrast.Shadow:null,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center };
     private Button ActionButton(string text,Action action)
     {
         var button=new Button { Content=Label(text,12,"#CFD2D9"),Padding=new Thickness(4),Background=Brushes.Transparent,BorderThickness=new Thickness(0) };
@@ -71,8 +74,8 @@ public sealed class CalendarWidget : Border
         {
             int days=item.DaysFrom(_today);
             var row=new Grid{Margin=new Thickness(0,8,0,2),Background=Brushes.Transparent};row.ColumnDefinitions.Add(new ColumnDefinition());row.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
-            row.Children.Add(new TextBlock{Text=item.Name,FontSize=12,Foreground=Fill(_paper?"#554D3E":"#D7DBE2"),VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new Thickness(0,0,8,0)});
-            var count=new TextBlock{Text=days==0?"今天":(days>0?"还有 ":"已过 ")+Math.Abs(days)+" 天",FontSize=18,Foreground=Fill(_paper?"#393D38":"#F0F7FA"),VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(count,1);row.Children.Add(count);
+            row.Children.Add(new TextBlock{Text=item.Name,FontSize=12,Foreground=Fill(_paper?"#30444C":"#D7DBE2"),Effect=_glass?TextContrast.Shadow:null,VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new Thickness(0,0,8,0)});
+            var count=new TextBlock{Text=days==0?"今天":(days>0?"还有 ":"已过 ")+Math.Abs(days)+" 天",FontSize=18,Foreground=Fill(_paper?"#1E323A":"#F0F7FA"),Effect=_glass?TextContrast.Shadow:null,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(count,1);row.Children.Add(count);
             var button=new Button{Content=row,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(2),HorizontalContentAlignment=HorizontalAlignment.Stretch,ToolTip=item.Date.ToString("yyyy年M月d日")};button.Click+=(_,_)=>EditCounter(item);
             var presenter=new FrameworkElementFactory(typeof(ContentPresenter));presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty,HorizontalAlignment.Stretch);
             button.Template=new ControlTemplate(typeof(Button)){VisualTree=presenter};

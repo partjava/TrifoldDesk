@@ -49,9 +49,10 @@ public sealed class WidgetFrame : Border
         if (body is FolderWidget folderBody) { folderBody.ExpandRequested += ToggleCollapsed; folderBody.ContentChanged += () => Constrain(false); folderBody.EdgeExpansionRequested+=ExpandFolderEdge;folderBody.EdgeExpansionFinished+=FinishFolderEdge; }
         CornerRadius = new CornerRadius(18); BorderThickness = new Thickness(1); BorderBrush = new SolidColorBrush(Color.FromArgb(70, 255, 255, 255));
         if (model.PluginId is "apps" or "projects") { CornerRadius = new CornerRadius(0); BorderThickness = new Thickness(0); Background = Brushes.Transparent; }
-        bool themed = model.PluginId is "system-summary" or "cpu" or "memory" or "network" or "gpu" or "clock" or "battery" or "calendar";
+        bool themed = model.PluginId is "system-summary" or "cpu" or "memory" or "network" or "gpu" or "clock" or "battery" or "calendar" or "photo-line";
         if (themed && model.Style is "paper" or "neon") Background = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(model.Style == "paper" ? "#F8F1E4" : "#E62E214C"), (Color)ColorConverter.ConvertFromString(model.Style == "paper" ? "#E8EEE8" : "#D416253E"), 50);
         else Background = Brushes.Transparent; ClipToBounds = true;
+        if (themed && model.Style == "ink") BorderBrush = new SolidColorBrush(Color.FromArgb(65, 30, 48, 60));
         if (model.PluginId == "folder") CornerRadius = new CornerRadius(10);
         bool folderFrame = model.PluginId == "folder";
         var grid = _grid; grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(folderFrame ? 4 : (model.PluginId == "clock" && !model.IsCollapsed) ? 12 : 36) }); grid.RowDefinitions.Add(new RowDefinition()); Child = grid;
@@ -60,7 +61,8 @@ public sealed class WidgetFrame : Border
         var transparent = new FrameworkElementFactory(typeof(Border)); transparent.SetValue(Border.BackgroundProperty, Brushes.Transparent);
         _move.Template = new ControlTemplate(typeof(Thumb)) { VisualTree = transparent }; header.Children.Add(_move);
         _title.TextTrimming = TextTrimming.CharacterEllipsis; _title.FontSize = 11; _title.FontWeight = FontWeights.SemiBold;
-        if (themed && model.Style == "paper") _title.Foreground = new SolidColorBrush(Color.FromRgb(48, 72, 76));
+        if (themed && TextContrast.IsDarkTextStyle(model.Style)) _title.Foreground = new SolidColorBrush(Color.FromRgb(32, 52, 60));
+        else if (model.Style == "glass") _title.Effect = TextContrast.Shadow;
         _title.VerticalAlignment = VerticalAlignment.Center; _title.Margin = new Thickness(0, 0, 8, 0); _title.IsHitTestVisible = false; header.Children.Add(_title);
         if (folderFrame) { _title.Visibility = Visibility.Collapsed; ToolTip = model.Title; }
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center }; header.Children.Add(actions);
@@ -102,7 +104,7 @@ public sealed class WidgetFrame : Border
             fit.Click+=(_,_)=>ChangeState(()=>Model.FolderAutoHeight=fit.IsChecked);
             menu.Opened+=(_,_)=>fit.IsChecked=Model.FolderAutoHeight;
         }
-        if (themed && themeChanged != null) foreach (var (name, style) in new[] { ("无色透明", "glass"), ("浅色纸片", "paper"), ("霓虹紫", "neon") }) { var choice = new MenuItem { Header = "主题 · " + name, IsCheckable = true, IsChecked = model.Style == style }; choice.Click += (_, _) => themeChanged(style); menu.Items.Add(choice); }
+        if (themed && themeChanged != null) foreach (var (name, style) in new[] { ("无色透明", "glass"), ("深墨透明（浅色壁纸）", "ink"), ("浅色纸片", "paper"), ("霓虹紫", "neon") }) { var choice = new MenuItem { Header = "主题 · " + name, IsCheckable = true, IsChecked = model.Style == style }; choice.Click += (_, _) => themeChanged(style); menu.Items.Add(choice); }
         var rename = new MenuItem { Header = "重命名插件" }; menu.Items.Add(rename);
         rename.Click += (_, _) => { _before = Copy(); var name = TextInputDialog.Ask(Window.GetWindow(this)!, "插件名称", _title.Text); if (name != null) { Model.Title = name.Trim(); UpdateState(); Commit(); } _before = null; };
         var auto = new MenuItem { Header = "鼠标离开后自动收起", IsCheckable = true, IsChecked = Model.AutoCollapse }; menu.Items.Add(auto);

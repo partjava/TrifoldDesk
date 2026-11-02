@@ -1,5 +1,24 @@
 namespace TrifoldDesk;
 
+internal static class TextContrast
+{
+    internal static readonly System.Windows.Media.Effects.Effect Shadow = CreateShadow();
+    private static System.Windows.Media.Effects.Effect CreateShadow()
+    {
+        var effect = new System.Windows.Media.Effects.DropShadowEffect
+        {
+            Color = Color.FromRgb(10, 18, 26),
+            BlurRadius = 5,
+            ShadowDepth = 1,
+            Direction = 315,
+            Opacity = 0.88
+        };
+        effect.Freeze();
+        return effect;
+    }
+    internal static bool IsDarkTextStyle(string style) => style is "paper" or "ink";
+}
+
 public sealed class AnalogClock : FrameworkElement
 {
     private DrawingGroup? _face; private Size _faceSize; private Brush? _faceInk;

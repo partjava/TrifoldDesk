@@ -12,7 +12,7 @@ internal static class PluginPreview
         root.RowDefinitions.Add(new()); root.RowDefinitions.Add(new() { Height = GridLength.Auto });
         FrameworkElement content = id switch
         {
-            "system-summary" => Summary(), "folder" => Folder(), "calendar" => Calendar(), "clock" => Clock(), "controls" => Controls(),
+            "system-summary" => Summary(), "folder" => Folder(), "calendar" => Calendar(), "clock" => Clock(), "controls" => Controls(), "photo-line" => PhotoLine(),
             "workbench" => SampleLines("今天的计划", "✓ 整理资料", "○ 完成一套练习", "便签 / 待办"),
             "weather" => SampleLines("北京 · 晴", "24°", "湿度 48% · 风速 8 km/h", "更新时间 15:00"),
             "music" => SampleLines("♫", "正在播放的歌曲", "艺术家 · 系统媒体", "右键控制播放"),
@@ -103,6 +103,28 @@ internal static class PluginPreview
         var actions = new UniformGrid { Columns = 2 };
         foreach (string name in new[] { "常亮", "设置" }) actions.Children.Add(new Border { Background = Fill("#12FFFFFF"), CornerRadius = new CornerRadius(5), Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 6, 0), Child = Label(name, 11) });
         stack.Children.Add(actions); return stack;
+    }
+    private static FrameworkElement PhotoLine()
+    {
+        var grid = new Grid { Margin = new Thickness(2, 4, 2, 2) };
+        grid.Children.Add(new ClotheslineRope { Height = 20, VerticalAlignment = VerticalAlignment.Top });
+        var cards = new UniformGrid { Columns = 3, Margin = new Thickness(4, 6, 4, 0) };
+        (string Title, string Color, double Angle)[] samples = [("接口草图", "#4B8BBE", -2.5), ("报错截图", "#58A68C", 1.8), ("参考排版", "#9C78C4", -1.4)];
+        foreach (var sample in samples)
+        {
+            var holder = new Grid { Margin = new Thickness(4, 0, 4, 2), RenderTransformOrigin = new Point(0.5, 0.05), RenderTransform = new RotateTransform(sample.Angle) };
+            var polaroid = new Border { Margin = new Thickness(0, 6, 0, 0), Background = Fill("#FCFBF7"), CornerRadius = new CornerRadius(3), Padding = new Thickness(4, 4, 4, 5) };
+            var inner = new StackPanel();
+            inner.Children.Add(new Border { Height = 46, Background = Fill(sample.Color), CornerRadius = new CornerRadius(2) });
+            var caption = Label(sample.Title, 9, "#26343F"); caption.HorizontalAlignment = HorizontalAlignment.Center; caption.Margin = new Thickness(0, 3, 0, 0);
+            inner.Children.Add(caption);
+            polaroid.Child = inner;
+            holder.Children.Add(polaroid);
+            holder.Children.Add(new Border { Width = 7, Height = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top, Background = Fill("#D6A66C"), CornerRadius = new CornerRadius(1.5) });
+            cards.Children.Add(holder);
+        }
+        grid.Children.Add(cards);
+        return grid;
     }
 }
 

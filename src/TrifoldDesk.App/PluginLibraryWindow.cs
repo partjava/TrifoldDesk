@@ -9,10 +9,10 @@ public sealed class PluginLibraryWindow : Window
     private readonly Dictionary<string, (Button Add, ComboBox Pane, ComboBox Style)> _choices = [];
     private readonly Dictionary<string, FrameworkElement> _previews = [];
     private static readonly string[] PaneNames = ["左", "中", "右"];
-    private static readonly string[] AvailableIds = ["system-summary", "folder", "calendar", "clock", "controls", "workbench", "weather", "music", "project-browser"];
+    private static readonly string[] AvailableIds = ["system-summary", "folder", "calendar", "clock", "controls", "photo-line", "workbench", "weather", "music", "project-browser"];
     private static string DisplayName(string id) => id switch
     {
-        "system-summary" => "系统概览", "folder" => "文件夹", "calendar" => "日历", "clock" => "时钟", "controls" => "快捷控制",
+        "system-summary" => "系统概览", "folder" => "文件夹", "calendar" => "日历", "clock" => "时钟", "controls" => "快捷控制", "photo-line" => "截图挂绳",
         "apps" => "应用", "projects" => "资料", "cpu" => "CPU", "gpu" => "GPU", "memory" => "内存", "network" => "网速", "battery" => "电池", "disks" => "磁盘",
         _ => PluginRules.Catalog.FirstOrDefault(p => p.Id == id)?.Name ?? id
     };
@@ -44,7 +44,7 @@ public sealed class PluginLibraryWindow : Window
             var pane = new ComboBox { Width = 62, Height = 30, Padding = new Thickness(6, 2, 6, 2), FontSize = 12, ToolTip = "放置位置", ItemsSource = PaneNames, SelectedIndex = definition.Pane, Margin = new Thickness(0, 0, 6, 0) };
             actions.Children.Add(pane);
             // Keep existing test/import style semantics; the compact library adds the default appearance.
-            var style = new ComboBox { ItemsSource = new[] { "透明", "纸片", "霓虹" }, SelectedIndex = 0 };
+            var style = new ComboBox { ItemsSource = new[] { "透明", "纸片", "霓虹", "深墨" }, SelectedIndex = 0 };
             var add = new Button { Content = "＋", ToolTip = "添加", Width = 30, Height = 30, Padding = new Thickness(0), FontSize = 17 };
             actions.Children.Add(add); _choices[id] = (add, pane, style);
             row.Children.Add(new TextBlock { Text = DisplayName(id), FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brushes.WhiteSmoke, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
@@ -53,7 +53,7 @@ public sealed class PluginLibraryWindow : Window
             add.Click += (_, _) =>
             {
                 if (!PluginRules.CanAdd(Result, id, pane.SelectedIndex)) return;
-                var added = PluginRules.Add(Result, id, pane.SelectedIndex, style.SelectedIndex == 1 ? "paper" : style.SelectedIndex == 2 ? "neon" : "glass");
+                var added = PluginRules.Add(Result, id, pane.SelectedIndex, style.SelectedIndex == 1 ? "paper" : style.SelectedIndex == 2 ? "neon" : style.SelectedIndex == 3 ? "ink" : "glass");
                 if (id == "folder") { added.Width = 280; added.Height = 320; }
                 Refresh();
             };

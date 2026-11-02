@@ -44,15 +44,17 @@ public sealed class DashboardWidget : Grid
     public DashboardWidget(string kind, string style, MainViewModel model, bool compact = false)
     {
         _kind = kind; _model = model; _compact = compact;
-        _ink = Brush(style == "paper" ? "#243D45" : "#F2F6F8"); _muted = Brush(style == "paper" ? "#587079" : "#A8BDC8");
-        _accent = Brush(style == "neon" ? "#B395FF" : style == "paper" ? "#267E73" : "#74E1D1");
+        bool darkText = TextContrast.IsDarkTextStyle(style);
+        _ink = Brush(darkText ? "#1E353D" : "#F2F6F8"); _muted = Brush(darkText ? "#48606A" : "#B8CBD6");
+        _accent = Brush(style == "neon" ? "#B395FF" : darkText ? "#1E786E" : "#74E1D1");
+        if (style == "glass") { _value.Effect = TextContrast.Shadow; _detail.Effect = TextContrast.Shadow; _extra.Effect = TextContrast.Shadow; }
         RowDefinitions.Add(new() { Height = GridLength.Auto }); RowDefinitions.Add(new() { Height = GridLength.Auto }); RowDefinitions.Add(new()); RowDefinitions.Add(new() { Height = GridLength.Auto });
         _value.FontSize = kind == "clock" ? 58 : kind == "network" ? 32 : 48; _value.FontWeight = FontWeights.Light; _value.Foreground = _ink; _value.Margin = new Thickness(4, 0, 4, 4); Children.Add(_value);
         _detail.FontSize = 11; _detail.Foreground = _muted; _detail.TextWrapping = TextWrapping.Wrap; _detail.Margin = new Thickness(6, 0, 6, 12); Grid.SetRow(_detail, 1); Children.Add(_detail);
         _plot.MinHeight = 30; _plot.Margin = new Thickness(6, 0, 6, 12); _plot.Accent = _accent; _plot.Percent = kind != "network"; Grid.SetRow(_plot, 2); Children.Add(_plot);
         _extra.FontSize = 11; _extra.Foreground = _accent; _extra.Margin = new Thickness(6, 0, 6, 6); _extra.TextWrapping = TextWrapping.Wrap; Grid.SetRow(_extra, 3); _extra.Visibility = Visibility.Collapsed;
         Children.Add(_extra);
-        if (kind is "memory" or "battery") { _plot.Visibility = Visibility.Collapsed; _gauge.Accent=new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#38BAC1"),(Color)ColorConverter.ConvertFromString(style=="paper"?"#267E73":"#74E1D1"),0); _gauge.Segmented=kind=="memory"; Grid.SetRow(_gauge,2); Children.Add(_gauge); }
+        if (kind is "memory" or "battery") { _plot.Visibility = Visibility.Collapsed; _gauge.Accent=new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#38BAC1"),(Color)ColorConverter.ConvertFromString(darkText?"#1E786E":"#74E1D1"),0); _gauge.Segmented=kind=="memory"; Grid.SetRow(_gauge,2); Children.Add(_gauge); }
         if(kind=="clock")
         {
             ColumnDefinitions.Add(new(){Width=new GridLength(1.7,GridUnitType.Star)}); ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});

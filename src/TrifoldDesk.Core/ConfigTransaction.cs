@@ -9,7 +9,7 @@ public static class ConfigTransaction
     public const string PendingFileName = "config-transaction.pending.json";
     private static readonly object Gate = new();
     private static readonly HashSet<string> Allowed = new(StringComparer.OrdinalIgnoreCase)
-        { "settings.json", "shortcuts.json", "widgets.json", "folders.json", "panes.json", "monitors.json", "events.json", "plugin-approvals.json", "optional-workbench.json", "optional-weather.json", "optional-projects.json" };
+        { "settings.json", "shortcuts.json", "widgets.json", "folders.json", "panes.json", "monitors.json", "events.json", "plugin-approvals.json", "optional-workbench.json", "optional-weather.json", "optional-projects.json", "optional-photos.json" };
     private sealed class Journal
     {
         public int Version { get; set; } = 1;

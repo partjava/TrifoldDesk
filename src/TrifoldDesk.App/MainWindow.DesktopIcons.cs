@@ -82,7 +82,7 @@ public partial class MainWindow
             var bounds=WidgetLayout.ClampToPane(entry.X,entry.Y,70,70,entry.PaneIndex,WidgetCanvas.ActualWidth,WidgetCanvas.ActualHeight,70,70);
             var button=new Button{Width=68,Height=68,Padding=new Thickness(2),Background=Brushes.Transparent,BorderThickness=new Thickness(0),ToolTip=entry.Item.Name+"\n"+entry.Item.SourcePath,Tag=entry.Item.Id};
             var content=new StackPanel();content.Children.Add(new Image{Source=ShellLinkHelper.GetIcon(entry.Item),Width=40,Height=40});
-            content.Children.Add(new TextBlock{Text=entry.Item.Name,FontSize=11,TextAlignment=TextAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new Thickness(0,4,0,0)});button.Content=content;
+            content.Children.Add(new TextBlock{Text=entry.Item.Name,FontSize=11,Effect=TextContrast.Shadow,TextAlignment=TextAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new Thickness(0,4,0,0)});button.Content=content;
             Point press=default;bool dragging=false;
             button.PreviewMouseLeftButtonDown+=(_,e)=>{press=e.GetPosition(button);dragging=false;button.CaptureMouse();e.Handled=true;};
             button.PreviewMouseMove+=(_,e)=>

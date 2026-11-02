@@ -48,6 +48,7 @@ public static class PluginRules
         new("memory", "内存状态", "物理内存占用与已用容量。", 2),
         new("network", "网络速率", "所选网卡的即时上传与下载。", 2),
         new("disks", "全部磁盘", "所有逻辑卷的容量、可用空间与打开入口。", 2),
+        new("photo-line", "截图挂绳", "把剪贴板截图或图片用小夹子挂在绳子上；点击放大或钉在桌面参考。", 1, true),
         new("workbench", "工作台", "便签与待办；右键切换、归档和恢复。", 1, true),
         new("weather", "天气", "选择城市后显示实际天气，离线保留缓存。", 2, true),
         new("music", "音乐", "系统媒体会话的歌曲、封面与播放控制。", 2, true),
@@ -64,7 +65,7 @@ public static class PluginRules
     public static WidgetInstance Add(WidgetConfig config, string id, int pane, string style = "glass")
     {
         if (!CanAdd(config, id, pane)) throw new InvalidOperationException("插件不可重复添加、位置不匹配，或已达24个实例上限。");
-        var item = new WidgetInstance { PluginId = id, PaneIndex = pane, Style = style is "paper" or "neon" ? style : "glass" };
+        var item = new WidgetInstance { PluginId = id, PaneIndex = pane, Style = style is "paper" or "neon" or "ink" ? style : "glass" };
         config.Items.Add(item); return item;
     }
     public static WidgetConfig Defaults(bool legacy)

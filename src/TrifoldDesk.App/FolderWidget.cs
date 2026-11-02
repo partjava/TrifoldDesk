@@ -152,7 +152,7 @@ public sealed class FolderWidget : Grid
             var button = new Button { Width = 68, Height = 64, AllowDrop=true, Padding = new Thickness(2), Margin = new Thickness(1), Background = Brushes.Transparent, BorderBrush = Brushes.Transparent, ToolTip = item.Name + "\n" + item.SourcePath };
             var stack = new StackPanel(); button.Content = stack;
             stack.Children.Add(new Image { Source = ItemIcon(item), Width = 40, Height = 40 });
-            stack.Children.Add(new TextBlock { Text = item.Name, FontSize = 11, TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 4, 0, 0) });
+            stack.Children.Add(new TextBlock { Text = item.Name, FontSize = 11, Effect = TextContrast.Shadow, TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 4, 0, 0) });
             button.PreviewMouseLeftButtonDown += (_, e) => { _press = e.GetPosition(button); _dragged = false; button.CaptureMouse(); e.Handled=true; };
             button.PreviewMouseLeftButtonUp += (_, e) => { var point=e.GetPosition(button); button.ReleaseMouseCapture(); e.Handled=true; if(!_dragged&&point.X>=0&&point.Y>=0&&point.X<=button.ActualWidth&&point.Y<=button.ActualHeight)button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); };
             button.PreviewMouseMove += (_, e) =>

@@ -46,5 +46,14 @@ public static class ExtraWidgetTests
         var productivity = new ProductivityConfig { Widgets = new() { ["one"] = task, ["two"] = new() { Notes = "independent" } } };
         var roundtrip = JsonSerializer.Deserialize<ProductivityConfig>(JsonSerializer.Serialize(productivity))!;
         check(roundtrip.Widgets["one"].Tasks.Single().Id == "task-id" && roundtrip.Widgets["two"].Notes == "independent", "optional widget configuration persists per-instance task and note data");
+        var photoLine = new PhotoLineData();
+        photoLine = PhotoLineRules.AddPhoto(photoLine, "assets/screenshots/one.png", "第一张", "p1");
+        photoLine = PhotoLineRules.AddPhoto(photoLine, "assets/screenshots/two.png", "第二张", "p2");
+        check(photoLine.Items.Count == 2 && photoLine.Items[0].Id == "p2" && photoLine.Items[1].Id == "p1", "hanging new screenshot prepends onto clothesline with isolated state");
+        var reorderedPhotos = PhotoLineRules.MovePhoto(photoLine, "p2", "p1");
+        check(reorderedPhotos.Items[0].Id == "p1" && reorderedPhotos.Items[1].Id == "p2", "dragging hanging photo reorders clothesline slots");
+        var renamedPhotos = PhotoLineRules.RenamePhoto(reorderedPhotos, "p1", "接口参考图");
+        var afterRemove = PhotoLineRules.RemovePhoto(renamedPhotos, "p2");
+        check(afterRemove.Items.Single().Title == "接口参考图" && photoLine.Items.Count == 2, "renaming and removing hanging photos preserves immutability");
     }
 }
