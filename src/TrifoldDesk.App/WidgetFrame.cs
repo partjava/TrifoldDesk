@@ -67,8 +67,8 @@ public sealed class WidgetFrame : Border
         }
         else
         {
-            Background = (model.PluginId is "apps" or "projects") ? Brushes.Transparent : new SolidColorBrush(Color.FromArgb(28, 15, 23, 42));
-            BorderBrush = new SolidColorBrush(Color.FromArgb(45, 255, 255, 255));
+            Background = (model.PluginId is "apps" or "projects" or "folder") ? Brushes.Transparent : new SolidColorBrush(Color.FromArgb(28, 15, 23, 42));
+            BorderBrush = (model.PluginId == "folder") ? Brushes.Transparent : new SolidColorBrush(Color.FromArgb(45, 255, 255, 255));
         }
         ClipToBounds = true;
         if (model.PluginId == "folder") CornerRadius = new CornerRadius(10);
@@ -87,12 +87,12 @@ public sealed class WidgetFrame : Border
         _actions = actions;
         actions.Visibility = Visibility.Collapsed;
         actions.Opacity = model.IsCollapsed ? 1 : 0;
-        MouseEnter += (_, _) => { actions.Opacity = 1; _resize.Opacity = 1; };
-        MouseLeave += (_, _) => { if (!Model.IsCollapsed) actions.Opacity = 0; _resize.Opacity = 0; };
+        MouseEnter += (_, _) => { actions.Opacity = 1; _resize.Opacity = 1; if (folderFrame) BorderBrush = new SolidColorBrush(Color.FromArgb(50, 255, 255, 255)); };
+        MouseLeave += (_, _) => { if (!Model.IsCollapsed) actions.Opacity = 0; _resize.Opacity = 0; if (folderFrame) BorderBrush = Brushes.Transparent; };
         foreach (var button in new[] { _lock, _fold }) { button.Padding = new Thickness(7, 4, 7, 4); button.FontSize = 11; button.Margin = new Thickness(3, 0, 0, 0); actions.Children.Add(button); }
         _lock.ToolTip = "锁定/解锁位置与尺寸"; _lock.Click += (_, _) => ChangeState(() => Model.IsLocked = !Model.IsLocked);
         _fold.ToolTip = "收起/展开"; _fold.Click += (_, _) => ToggleCollapsed();
-        var bodyHolder = new Border { Padding = folderFrame ? new Thickness(4, 0, 4, 4) : new Thickness(12, 0, 12, 16), Child = body }; Grid.SetRow(bodyHolder, 1); grid.Children.Add(bodyHolder);
+        var bodyHolder = new Border { Padding = folderFrame ? new Thickness(1, 0, 1, 4) : new Thickness(12, 0, 12, 16), Child = body }; Grid.SetRow(bodyHolder, 1); grid.Children.Add(bodyHolder);
         if (folderFrame) { Grid.SetRowSpan(header,2); _move.Height=4; _move.VerticalAlignment=VerticalAlignment.Top; actions.VerticalAlignment = VerticalAlignment.Top; Panel.SetZIndex(header,1); }
         _resize.Width = 20; _resize.Height = 20; _resize.HorizontalAlignment = HorizontalAlignment.Right; _resize.VerticalAlignment = VerticalAlignment.Bottom; _resize.Cursor = Cursors.SizeNWSE;
         _resize.Width=12; _resize.Height=12;

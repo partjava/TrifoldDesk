@@ -65,10 +65,10 @@ public sealed class FolderWidget : Grid
     }
     public event Action? ExpandRequested;
     public event Action? ContentChanged;
-    public double FittedHeight(double width) => Math.Max(_dropGridActive?146:80, Math.Ceiling((FolderRules.Positions(_read()).Values.DefaultIfEmpty(0).Max()+1) / (double)Math.Max(1,(int)((width-10)/70))) * 66 + 10);
+    public double FittedHeight(double width) => Math.Max(_dropGridActive?146:80, Math.Ceiling((FolderRules.Positions(_read()).Values.DefaultIfEmpty(0).Max()+1) / (double)Math.Max(1,(int)((width-4)/70))) * 66 + 10);
     public double FittedWidth(double width)
     {
-        int columns=Math.Max(1,(int)((width-10)/70));
+        int columns=Math.Max(1,(int)((width-4)/70));
         int extent=FolderRules.Positions(_read()).Values.DefaultIfEmpty(0).Max()+1;
         return _dropGridActive?Math.Max(220,width):Math.Max(80,Math.Min(columns,extent)*70+10);
     }
@@ -121,8 +121,8 @@ public sealed class FolderWidget : Grid
         AllowDrop = true; Background = Brushes.Transparent;
         DragOver += (_, e) => { if(_mappedReadOnly){e.Effects=DragDropEffects.None;e.Handled=true;return;} e.Effects = e.Data.GetDataPresent(DragFormat) || e.Data.GetDataPresent(LibraryFormat) ? (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)||e.Data.GetData(DragFormat) is FolderDrag { MappedItem: not null } ? DragDropEffects.Copy : DragDropEffects.Move) : e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Link : DragDropEffects.None; if(e.Effects!=DragDropEffects.None){SetDropGrid(true);TrackEdge(e.GetPosition(this));} e.Handled = true; };
         DragLeave+=(_,e)=>{var point=e.GetPosition(this);if(point.X<0||point.Y<0||point.X>ActualWidth||point.Y>ActualHeight){StopEdge(false);SetDropGrid(false);}};
-        Drop += (_, e) => { var point=e.GetPosition(_icons); int columns=Math.Max(1,(int)(scroll.ActualWidth/70)); DropAt(e,Math.Max(0,(int)(point.Y/66))*columns+Math.Clamp((int)(point.X/70),0,columns-1)); };
-        scroll.SizeChanged += (_, _) => { int columns=Math.Max(1,(int)(scroll.ActualWidth/70)); int capacity=columns*Math.Max(1,(int)(scroll.ActualHeight/66)); if(columns==_lastColumns && capacity==_lastCapacity)return; _lastColumns=columns; _lastCapacity=capacity; Refresh(); };
+        Drop += (_, e) => { var point=e.GetPosition(_icons); int columns=Math.Max(1,(int)((scroll.ActualWidth+4)/70)); DropAt(e,Math.Max(0,(int)(point.Y/66))*columns+Math.Clamp((int)(point.X/70),0,columns-1)); };
+        scroll.SizeChanged += (_, _) => { int columns=Math.Max(1,(int)((scroll.ActualWidth+4)/70)); int capacity=columns*Math.Max(1,(int)(scroll.ActualHeight/66)); if(columns==_lastColumns && capacity==_lastCapacity)return; _lastColumns=columns; _lastCapacity=capacity; Refresh(); };
         _preview.Child = _previewIcons; Grid.SetRowSpan(_preview,3); Children.Add(_preview);
         _preview.MouseLeftButtonUp += (_, e) => { if (_compact) { ExpandRequested?.Invoke(); e.Handled = true; } };
         Refresh();
@@ -179,7 +179,7 @@ public sealed class FolderWidget : Grid
             menu.Opened+=(_,_)=> { foreach(var action in menu.Items.OfType<MenuItem>())action.IsEnabled=!_mappedReadOnly; };
             _buttons[item.Id]=(signature,button); _icons.Children.Add(button);
         }
-        int capacity=Math.Max(1,(int)(Math.Max(70,ActualWidth)/70))*Math.Max(1,(int)(Math.Max(66,ActualHeight)/66));
+        int capacity=Math.Max(1,(int)((Math.Max(70,ActualWidth)+4)/70))*Math.Max(1,(int)(Math.Max(66,ActualHeight)/66));
         while(_icons.Children.Count<Math.Min(4096,capacity))AddEmptySlot(_icons.Children.Count);
         UpdateCount(ActualWidth, Math.Max(0, ActualHeight - 85));
         ContentChanged?.Invoke();
