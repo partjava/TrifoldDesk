@@ -3,10 +3,18 @@
     <Style TargetType="ToolTip"><Setter Property="Background" Value="#F1F3F5"/><Setter Property="Foreground" Value="#202830"/><Setter Property="Padding" Value="10,7"/><Setter Property="ContentTemplate"><Setter.Value><DataTemplate><TextBlock Text="{Binding}" Foreground="#202830" TextWrapping="Wrap" MaxWidth="560"/></DataTemplate></Setter.Value></Setter></Style>
     <Style TargetType="ContextMenu"><Setter Property="Background" Value="#F1F3F5"/><Setter Property="Foreground" Value="#202830"/><Setter Property="BorderBrush" Value="#9CAAB5"/></Style>
     <Style TargetType="MenuItem"><Setter Property="Foreground" Value="#202830"/><Setter Property="Background" Value="Transparent"/><Setter Property="Padding" Value="9,5"/><Setter Property="HeaderTemplate"><Setter.Value><DataTemplate><TextBlock Text="{Binding}" Foreground="#202830"/></DataTemplate></Setter.Value></Setter><Style.Resources><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#202830"/></Style></Style.Resources></Style>
-    <SolidColorBrush x:Key="Ink" Color="#F0F7FA"/>
-    <SolidColorBrush x:Key="Muted" Color="#B8C9D2"/>
-    <SolidColorBrush x:Key="Accent" Color="#00E5FF"/>
-    <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="FontFamily" Value="Segoe UI, Microsoft YaHei UI"/></Style>
+    <SolidColorBrush x:Key="Ink" Color="#F8FAFC"/>
+    <SolidColorBrush x:Key="Muted" Color="#CBD5E1"/>
+    <SolidColorBrush x:Key="Accent" Color="#38BDF8"/>
+    <Style TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource Ink}"/>
+      <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI, -apple-system, Microsoft YaHei UI, PingFang SC, sans-serif"/>
+      <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+      <Setter Property="TextOptions.TextRenderingMode" Value="ClearType"/>
+      <Setter Property="RenderOptions.ClearTypeHint" Value="Enabled"/>
+      <Setter Property="SnapsToDevicePixels" Value="True"/>
+      <Setter Property="UseLayoutRounding" Value="True"/>
+    </Style>
     <Style TargetType="Button">
       <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="Background" Value="#12FFFFFF"/>
       <Setter Property="BorderBrush" Value="#30FFFFFF"/><Setter Property="Padding" Value="12,9"/><Setter Property="Cursor" Value="Hand"/>

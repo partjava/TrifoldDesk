@@ -16,11 +16,11 @@ public sealed class MetricPlot : FrameworkElement
         var points = _samples.ToArray(); double maximum = Percent ? 100 : Math.Max(1, Math.Max(points.Max(),_secondary.Max()) * 1.15);
         var line = new StreamGeometry(); using (var c = line.Open()) { c.BeginFigure(new Point(0, h - h * Math.Min(points[0], maximum) / maximum), false, false); for (int n = 1; n < points.Length; n++) c.LineTo(new Point(w * n / (points.Length - 1), h - h * Math.Min(points[n], maximum) / maximum), true, false); }
         var fill = new StreamGeometry(); using(var c=fill.Open()) { c.BeginFigure(new Point(0,h),true,true); for(int n=0;n<points.Length;n++) c.LineTo(new Point(w*n/(points.Length-1),h-h*Math.Min(points[n],maximum)/maximum),true,false); c.LineTo(new Point(w,h),true,false); }
-        var color = Accent is SolidColorBrush solid ? solid.Color : Colors.Turquoise;
-        dc.DrawGeometry(new LinearGradientBrush(Color.FromArgb(50,color.R,color.G,color.B),Color.FromArgb(0,color.R,color.G,color.B),90),null,fill);
-        dc.DrawGeometry(null, new Pen(Accent, 1.5), line);
-        dc.DrawEllipse(Accent,null,new Point(w,h-h*Math.Min(points[^1],maximum)/maximum),2,2);
-        if(!Percent && _secondary.Any(v=>v>0)) { var up=_secondary.ToArray(); var path=new StreamGeometry(); using(var c=path.Open()){c.BeginFigure(new Point(0,h-h*up[0]/maximum),false,false);for(int n=1;n<up.Length;n++)c.LineTo(new Point(w*n/(up.Length-1),h-h*up[n]/maximum),true,false);} dc.DrawGeometry(null,new Pen(new SolidColorBrush(Color.FromArgb(110,color.R,color.G,color.B)),1),path); }
+        var color = Accent is SolidColorBrush solid ? solid.Color : Color.FromRgb(56, 189, 248);
+        dc.DrawGeometry(new LinearGradientBrush(Color.FromArgb(60, color.R, color.G, color.B), Color.FromArgb(0, color.R, color.G, color.B), 90), null, fill);
+        dc.DrawGeometry(null, new Pen(Accent, 1.8) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round }, line);
+        dc.DrawEllipse(Accent, null, new Point(w, h - h * Math.Min(points[^1], maximum) / maximum), 2.5, 2.5);
+        if(!Percent && _secondary.Any(v=>v>0)) { var up=_secondary.ToArray(); var path=new StreamGeometry(); using(var c=path.Open()){c.BeginFigure(new Point(0,h-h*up[0]/maximum),false,false);for(int n=1;n<up.Length;n++)c.LineTo(new Point(w*n/(up.Length-1),h-h*up[n]/maximum),true,false);} dc.DrawGeometry(null,new Pen(new SolidColorBrush(Color.FromArgb(120,color.R,color.G,color.B)),1.2),path); }
     }
 }
 public sealed class DashboardWidget : Grid
@@ -45,16 +45,16 @@ public sealed class DashboardWidget : Grid
     {
         _kind = kind; _model = model; _compact = compact;
         bool darkText = TextContrast.IsDarkTextStyle(style);
-        _ink = Brush(darkText ? "#1E353D" : "#F2F6F8"); _muted = Brush(darkText ? "#48606A" : "#B8CBD6");
-        _accent = Brush(style == "neon" ? "#B395FF" : darkText ? "#1E786E" : "#74E1D1");
-        if (style == "glass") { _value.Effect = TextContrast.Shadow; _detail.Effect = TextContrast.Shadow; _extra.Effect = TextContrast.Shadow; }
+        _ink = Brush(darkText ? "#0F172A" : "#F8FAFC"); _muted = Brush(darkText ? "#475569" : "#CBD5E1");
+        _accent = Brush(style == "neon" ? "#C084FC" : darkText ? "#0D9488" : "#38BDF8");
+        if (style == "glass") { _value.Effect = TextContrast.HeadingShadow; _detail.Effect = TextContrast.Shadow; _extra.Effect = TextContrast.Shadow; }
         RowDefinitions.Add(new() { Height = GridLength.Auto }); RowDefinitions.Add(new() { Height = GridLength.Auto }); RowDefinitions.Add(new()); RowDefinitions.Add(new() { Height = GridLength.Auto });
         _value.FontSize = kind == "clock" ? 58 : kind == "network" ? 32 : 48; _value.FontWeight = FontWeights.Light; _value.Foreground = _ink; _value.Margin = new Thickness(4, 0, 4, 4); Children.Add(_value);
         _detail.FontSize = 11; _detail.Foreground = _muted; _detail.TextWrapping = TextWrapping.Wrap; _detail.Margin = new Thickness(6, 0, 6, 12); Grid.SetRow(_detail, 1); Children.Add(_detail);
         _plot.MinHeight = 30; _plot.Margin = new Thickness(6, 0, 6, 12); _plot.Accent = _accent; _plot.Percent = kind != "network"; Grid.SetRow(_plot, 2); Children.Add(_plot);
         _extra.FontSize = 11; _extra.Foreground = _accent; _extra.Margin = new Thickness(6, 0, 6, 6); _extra.TextWrapping = TextWrapping.Wrap; Grid.SetRow(_extra, 3); _extra.Visibility = Visibility.Collapsed;
         Children.Add(_extra);
-        if (kind is "memory" or "battery") { _plot.Visibility = Visibility.Collapsed; _gauge.Accent=new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#38BAC1"),(Color)ColorConverter.ConvertFromString(darkText?"#1E786E":"#74E1D1"),0); _gauge.Segmented=kind=="memory"; Grid.SetRow(_gauge,2); Children.Add(_gauge); }
+        if (kind is "memory" or "battery") { _plot.Visibility = Visibility.Collapsed; _gauge.Accent=new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#10B981"),(Color)ColorConverter.ConvertFromString(darkText?"#0D9488":"#06B6D4"),0); _gauge.Segmented=kind=="memory"; Grid.SetRow(_gauge,2); Children.Add(_gauge); }
         if(kind=="clock")
         {
             ColumnDefinitions.Add(new(){Width=new GridLength(1.7,GridUnitType.Star)}); ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});
@@ -105,9 +105,21 @@ public sealed class DashboardWidget : Grid
                 _detail.Text = missing ? "此设备没有系统电池" : unknown ? "电源信息暂不可用" : power.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online ? "已连接电源" : power.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline ? "正在使用电池" : "供电状态未知";
                 _extra.Text = !missing && power.BatteryLifeRemaining > 0 ? $"预计剩余 {TimeSpan.FromSeconds(power.BatteryLifeRemaining):h\\:mm}" : "Windows 系统电源状态"; _gauge.UpdateValue(missing||unknown?0:power.BatteryLifePercent*100); BatteryUpdated?.Invoke(_gauge.Value,!missing&&!unknown&&power.PowerLineStatus==System.Windows.Forms.PowerLineStatus.Online); break;
             case "gpu":
-                if (!_active) { _value.Text = "—"; _detail.Text = "GPU · 3D引擎"; _extra.Text = "等待组件启动"; break; }
+                if (!_active) { _value.Text = "0%"; _detail.Text = "GPU · 3D引擎"; _extra.Text = "等待组件启动"; break; }
                 _busy = true; int generation = _generation; var provider = _gpu ??= new GpuMonitorService();
-                try { var selected=(Application.Current.MainWindow as MainWindow)?.SelectedGpuId??""; var result = await Task.Run(()=>provider.Read(selected)); if (!_active || generation != _generation) return; _value.Text = result.Value is double v ? $"{v:0}%" : "—"; _detail.Text = string.IsNullOrEmpty(result.AdapterName)?(_hardware?.Gpu??"显卡不可用"):result.AdapterName.Replace("NVIDIA GeForce ",""); _detail.ToolTip=_detail.Text+"\n"+result.Status; _extra.Text = result.DedicatedMemoryUsedBytes is double memory?$"显存 {memory/1073741824d:0.0} / {(result.DedicatedMemoryTotalBytes??0)/1073741824d:0.0} GB":result.Status; UtilizationUpdated?.Invoke(result.Value); if (result.Value is double sample) SamplePlot(sample); }
+                try {
+                    var selected=(Application.Current.MainWindow as MainWindow)?.SelectedGpuId??"";
+                    var result = await Task.Run(()=>provider.Read(selected));
+                    if (!_active || generation != _generation) return;
+                    _value.Text = result.Value is double v ? $"{v:0}%" : "0%";
+                    string gpuName = !string.IsNullOrEmpty(result.AdapterName) ? result.AdapterName : (_hardware?.Gpu ?? "图形处理器");
+                    gpuName = gpuName.Replace("NVIDIA GeForce ", "").Replace(" Laptop GPU", "");
+                    _detail.Text = gpuName;
+                    _detail.ToolTip = gpuName + "\n" + result.Status;
+                    _extra.Text = result.DedicatedMemoryUsedBytes is double memory ? $"显存 {memory/1073741824d:0.0} / {(result.DedicatedMemoryTotalBytes??0)/1073741824d:0.0} GB" : result.Status;
+                    UtilizationUpdated?.Invoke(result.Value ?? 0);
+                    SamplePlot(result.Value ?? 0);
+                }
                 finally { _busy = false; } break;
         }
     }

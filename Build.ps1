@@ -1,4 +1,4 @@
-﻿param([switch]$Test, [string]$Version = '0.10.17')
+param([switch]$Test, [string]$Version = '0.10.17')
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $env:DOTNET_CLI_HOME = Join-Path $PSScriptRoot '.dotnet'
@@ -10,7 +10,7 @@ if ($Test) {
     if ($LASTEXITCODE -ne 0) { throw 'Core 测试失败，停止发布。' }
 }
 $taskOutput = Join-Path $PSScriptRoot ('dist\v' + $Version)
-& dotnet publish src/TrifoldDesk.App -c Release --self-contained false -o $taskOutput --disable-build-servers
+& dotnet publish src/TrifoldDesk.App -c Release -r win-x64 --self-contained true -o $taskOutput --disable-build-servers
 if ($LASTEXITCODE -ne 0) { throw '构建或发布失败，请查看上方输出。' }
 Write-Host "发布完成：$(Join-Path $taskOutput 'TrifoldDesk.exe')" -ForegroundColor Cyan
 if ($Test) {

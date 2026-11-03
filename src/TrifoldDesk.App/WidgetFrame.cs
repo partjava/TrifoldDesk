@@ -47,12 +47,30 @@ public sealed class WidgetFrame : Border
     {
         Model = model; _body = body; _canvas = canvas; _save = save;
         if (body is FolderWidget folderBody) { folderBody.ExpandRequested += ToggleCollapsed; folderBody.ContentChanged += () => Constrain(false); folderBody.EdgeExpansionRequested+=ExpandFolderEdge;folderBody.EdgeExpansionFinished+=FinishFolderEdge; }
-        CornerRadius = new CornerRadius(18); BorderThickness = new Thickness(1); BorderBrush = new SolidColorBrush(Color.FromArgb(70, 255, 255, 255));
+        CornerRadius = new CornerRadius(14); BorderThickness = new Thickness(1); BorderBrush = new SolidColorBrush(Color.FromArgb(48, 255, 255, 255));
         if (model.PluginId is "apps" or "projects") { CornerRadius = new CornerRadius(0); BorderThickness = new Thickness(0); Background = Brushes.Transparent; }
         bool themed = model.PluginId is "system-summary" or "cpu" or "memory" or "network" or "gpu" or "clock" or "battery" or "calendar" or "photo-line" or "workbench" or "weather" or "music" or "project-browser";
-        if (themed && model.Style is "paper" or "neon") Background = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(model.Style == "paper" ? "#F8F1E4" : "#E62E214C"), (Color)ColorConverter.ConvertFromString(model.Style == "paper" ? "#E8EEE8" : "#D416253E"), 50);
-        else Background = Brushes.Transparent; ClipToBounds = true;
-        if (themed && model.Style == "ink") BorderBrush = new SolidColorBrush(Color.FromArgb(65, 30, 48, 60));
+        if (themed && model.Style == "paper")
+        {
+            Background = new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#FAF9F6"), (Color)ColorConverter.ConvertFromString("#F1F5F9"), 45);
+            BorderBrush = new SolidColorBrush(Color.FromArgb(160, 226, 232, 240));
+        }
+        else if (themed && model.Style == "neon")
+        {
+            Background = new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#E8241044"), (Color)ColorConverter.ConvertFromString("#E00A1A36"), 45);
+            BorderBrush = new SolidColorBrush(Color.FromArgb(120, 168, 85, 247));
+        }
+        else if (themed && model.Style == "ink")
+        {
+            Background = new SolidColorBrush(Color.FromArgb(215, 12, 18, 28));
+            BorderBrush = new SolidColorBrush(Color.FromArgb(75, 50, 75, 100));
+        }
+        else
+        {
+            Background = (model.PluginId is "apps" or "projects") ? Brushes.Transparent : new SolidColorBrush(Color.FromArgb(28, 15, 23, 42));
+            BorderBrush = new SolidColorBrush(Color.FromArgb(45, 255, 255, 255));
+        }
+        ClipToBounds = true;
         if (model.PluginId == "folder") CornerRadius = new CornerRadius(10);
         bool folderFrame = model.PluginId == "folder";
         var grid = _grid; grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(folderFrame ? 4 : (model.PluginId == "clock" && !model.IsCollapsed) ? 12 : 36) }); grid.RowDefinitions.Add(new RowDefinition()); Child = grid;
@@ -104,7 +122,7 @@ public sealed class WidgetFrame : Border
             fit.Click+=(_,_)=>ChangeState(()=>Model.FolderAutoHeight=fit.IsChecked);
             menu.Opened+=(_,_)=>fit.IsChecked=Model.FolderAutoHeight;
         }
-        if (themed && themeChanged != null) foreach (var (name, style) in new[] { ("无色透明", "glass"), ("深墨透明（浅色壁纸）", "ink"), ("浅色纸片", "paper"), ("霓虹紫", "neon") }) { var choice = new MenuItem { Header = "主题 · " + name, IsCheckable = true, IsChecked = model.Style == style }; choice.Click += (_, _) => themeChanged(style); menu.Items.Add(choice); }
+        if (themed && themeChanged != null) foreach (var (name, style) in new[] { ("深空磨砂（玻璃）", "glass"), ("曜石暗黑（深墨）", "ink"), ("极简白瓷（纸片）", "paper"), ("赛博幻境（霓虹）", "neon") }) { var choice = new MenuItem { Header = "主题 · " + name, IsCheckable = true, IsChecked = model.Style == style }; choice.Click += (_, _) => themeChanged(style); menu.Items.Add(choice); }
         var rename = new MenuItem { Header = "重命名插件" }; menu.Items.Add(rename);
         rename.Click += (_, _) => { _before = Copy(); var name = TextInputDialog.Ask(Window.GetWindow(this)!, "插件名称", _title.Text); if (name != null) { Model.Title = name.Trim(); UpdateState(); Commit(); } _before = null; };
         var auto = new MenuItem { Header = "鼠标离开后自动收起", IsCheckable = true, IsChecked = Model.AutoCollapse }; menu.Items.Add(auto);

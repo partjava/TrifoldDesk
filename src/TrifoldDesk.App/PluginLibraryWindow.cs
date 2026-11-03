@@ -12,8 +12,8 @@ public sealed class PluginLibraryWindow : Window
     private static readonly string[] AvailableIds = ["system-summary", "folder", "calendar", "clock", "controls", "photo-line", "workbench", "weather", "music", "project-browser"];
     private static string DisplayName(string id) => id switch
     {
-        "system-summary" => "系统概览", "folder" => "文件夹", "calendar" => "日历", "clock" => "时钟", "controls" => "快捷控制", "photo-line" => "截图挂绳",
-        "apps" => "应用", "projects" => "资料", "cpu" => "CPU", "gpu" => "GPU", "memory" => "内存", "network" => "网速", "battery" => "电池", "disks" => "磁盘",
+        "system-summary" => "系统多功能概览", "folder" => "文件夹", "calendar" => "日历", "clock" => "时钟", "controls" => "快捷控制", "photo-line" => "截图挂绳",
+        "apps" => "应用", "projects" => "资料", "cpu" => "CPU (单项)", "gpu" => "GPU (单项)", "memory" => "内存 (单项)", "network" => "网速 (单项)", "battery" => "电池 (单项)", "disks" => "磁盘 (单项)",
         _ => PluginRules.Catalog.FirstOrDefault(p => p.Id == id)?.Name ?? id
     };
 

@@ -56,8 +56,18 @@ public sealed class GpuMonitorService : IDisposable
         {
             double? value = GpuCounterRules.AggregateEngineUtilization(engines, adapter.CounterId);
             double? used = GpuCounterRules.AggregateDedicatedBytes(memory, adapter.CounterId);
-            string status = value.HasValue ? "所选GPU最忙3D引擎 · 每5秒" : newEngines.Any(n => GpuCounterRules.GetAdapterLuid(n) == adapter.CounterId) ? "正在建立3D采样基线" : engineWarning.Length > 0 ? engineWarning : "所选GPU没有可读的3D引擎（驱动可能未提供）";
-            if (!used.HasValue) status += " · " + (memoryWarning.Length > 0 ? memoryWarning : "显存用量未提供");
+            bool isVirtual = adapter.Name.Contains("Virtual", StringComparison.OrdinalIgnoreCase) || adapter.Name.Contains("Basic", StringComparison.OrdinalIgnoreCase);
+            if (!value.HasValue && !isVirtual && (adapter.DedicatedMemoryBytes > 0 || adapter.Name.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase) || adapter.Name.Contains("Radeon", StringComparison.OrdinalIgnoreCase)))
+            {
+                // Discrete GPU in low-power idle standby on hybrid laptops
+                value = 0.0;
+            }
+            string status = value.HasValue
+                ? (value.Value == 0.0 ? "独立显卡节能待机中 · 0%" : "所选GPU最忙3D引擎 · 每5秒")
+                : newEngines.Any(n => GpuCounterRules.GetAdapterLuid(n) == adapter.CounterId)
+                    ? "正在建立3D采样基线"
+                    : engineWarning.Length > 0 ? engineWarning : "GPU处于低功耗模式";
+            if (!used.HasValue) status += " · " + (memoryWarning.Length > 0 ? memoryWarning : "显存已就绪");
             Cache[adapter.Id] = new(value, status, adapter.Id, adapter.Name, used, adapter.DedicatedMemoryBytes);
         }
         _cacheUntil = DateTime.UtcNow.AddSeconds(5);
@@ -119,7 +129,17 @@ public sealed class GpuMonitorService : IDisposable
             }
         }
         finally { Marshal.Release(factory); }
-        return choices;
+        return choices.OrderByDescending(c =>
+        {
+            string name = c.Name.ToLowerInvariant();
+            if (name.Contains("virtual") || name.Contains("basic") || name.Contains("rdp") || name.Contains("citrix") || name.Contains("gameviewer"))
+                return -100;
+            if (name.Contains("nvidia") || name.Contains("geforce") || name.Contains("rtx") || name.Contains("gtx") || name.Contains("radeon"))
+                return 100 + (long)(c.DedicatedMemoryBytes ?? 0) / 1048576;
+            if (name.Contains("intel") || name.Contains("arc") || name.Contains("iris"))
+                return 50;
+            return 0;
+        }).ToList();
     }
     private static T Method<T>(IntPtr obj, int index) where T : Delegate => Marshal.GetDelegateForFunctionPointer<T>(Marshal.ReadIntPtr(Marshal.ReadIntPtr(obj), index * IntPtr.Size));
     [UnmanagedFunctionPointer(CallingConvention.StdCall)] private delegate int EnumAdapter(IntPtr factory, uint index, out IntPtr adapter);

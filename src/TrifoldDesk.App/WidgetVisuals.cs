@@ -2,20 +2,39 @@ namespace TrifoldDesk;
 
 internal static class TextContrast
 {
-    internal static readonly System.Windows.Media.Effects.Effect Shadow = CreateShadow();
-    private static System.Windows.Media.Effects.Effect CreateShadow()
+    // Sharp subtle outline for small text (<= 12px) preventing blur into glyphs
+    internal static readonly System.Windows.Media.Effects.Effect Shadow = CreateSubtleShadow();
+    // Ambient soft drop shadow for large headers and large digits (>= 16px)
+    internal static readonly System.Windows.Media.Effects.Effect HeadingShadow = CreateHeadingShadow();
+
+    private static System.Windows.Media.Effects.Effect CreateSubtleShadow()
     {
         var effect = new System.Windows.Media.Effects.DropShadowEffect
         {
-            Color = Color.FromRgb(15, 20, 25),
-            BlurRadius = 3.5,
-            ShadowDepth = 1.0,
+            Color = Color.FromRgb(10, 15, 20),
+            BlurRadius = 1.2,
+            ShadowDepth = 0.8,
             Direction = 315,
-            Opacity = 0.75
+            Opacity = 0.55
         };
         effect.Freeze();
         return effect;
     }
+
+    private static System.Windows.Media.Effects.Effect CreateHeadingShadow()
+    {
+        var effect = new System.Windows.Media.Effects.DropShadowEffect
+        {
+            Color = Color.FromRgb(10, 15, 20),
+            BlurRadius = 3.5,
+            ShadowDepth = 1.2,
+            Direction = 315,
+            Opacity = 0.65
+        };
+        effect.Freeze();
+        return effect;
+    }
+
     internal static bool IsDarkTextStyle(string style) => style is "paper" or "ink";
 }
 
