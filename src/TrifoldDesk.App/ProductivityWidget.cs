@@ -8,6 +8,7 @@ public sealed class ProductivityWidget : Grid, IProfileReplacementParticipant
     private static readonly HashSet<ProductivityWidget> ActiveInstances = [];
     private readonly string _instanceId;
     private readonly ConfigManager _store;
+    private readonly string _style;
     private WorkbenchData _data = new();
     private readonly TextBox _notes = new() { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = Brushes.Transparent, Foreground = Brushes.WhiteSmoke, BorderThickness = new Thickness(0), MaxLength = 100000, Padding = new Thickness(4) };
     private readonly StackPanel _tasks = new();
@@ -17,9 +18,14 @@ public sealed class ProductivityWidget : Grid, IProfileReplacementParticipant
     private bool _dirty;
     private bool _retired;
     private bool _showArchived;
-    public ProductivityWidget(string instanceId, ConfigManager store)
+    public ProductivityWidget(string instanceId, ConfigManager store, string style = "glass")
     {
-        _instanceId = instanceId; _store = store;
+        _instanceId = instanceId; _store = store; _style = style;
+        bool darkText = TextContrast.IsDarkTextStyle(style);
+        _notes.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(darkText ? "#1E353D" : "#F4F8FA"));
+        _notes.CaretBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(darkText ? "#1E786E" : "#74E1D1"));
+        _status.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(darkText ? "#48606A" : "#D0E0E8"));
+        if (style == "glass") { _notes.Effect = TextContrast.Shadow; _status.Effect = TextContrast.Shadow; }
         foreach (var active in ActiveInstances.ToArray()) active.Flush();
         ActiveInstances.Add(this);
         RowDefinitions.Add(new()); RowDefinitions.Add(new() { Height = GridLength.Auto });
@@ -58,9 +64,12 @@ public sealed class ProductivityWidget : Grid, IProfileReplacementParticipant
         _tasks.Children.Clear(); if (!todo) return;
         var tasks = WorkbenchRules.VisibleTasks(_data, _showArchived);
         if (tasks.Count == 0) _tasks.Children.Add(new TextBlock { Text = _showArchived ? "暂无归档待办" : "暂无待办 · 右键添加", Foreground = Brushes.LightGray, Margin = new Thickness(4, 10, 4, 4) });
+        bool dark = TextContrast.IsDarkTextStyle(_style);
+        var taskFg = new SolidColorBrush((Color)ColorConverter.ConvertFromString(dark ? "#1E353D" : "#F4F8FA"));
+        var taskEffect = _style == "glass" ? TextContrast.Shadow : null;
         foreach (var task in tasks)
         {
-            var row = new CheckBox { Content = new TextBlock { Text = task.Text, TextWrapping = TextWrapping.Wrap, Foreground = Brushes.WhiteSmoke, Opacity = task.IsCompleted ? .6 : 1 }, IsChecked = task.IsCompleted, Margin = new Thickness(4, 5, 4, 5), IsEnabled = !task.IsArchived };
+            var row = new CheckBox { Content = new TextBlock { Text = task.Text, TextWrapping = TextWrapping.Wrap, Foreground = taskFg, Effect = taskEffect, Opacity = task.IsCompleted ? .6 : 1 }, IsChecked = task.IsCompleted, Margin = new Thickness(4, 5, 4, 5), IsEnabled = !task.IsArchived };
             row.Checked += (_, _) => { if (!task.IsArchived) Change(data => WorkbenchRules.SetCompleted(data, task.Id, true)); }; row.Unchecked += (_, _) => { if (!task.IsArchived) Change(data => WorkbenchRules.SetCompleted(data, task.Id, false)); };
             var itemMenu = new ContextMenu(); Menu(itemMenu, task.IsArchived ? "恢复" : "归档", () => Change(data => WorkbenchRules.SetArchived(data, task.Id, !task.IsArchived)));
             // An archived row remains enabled for its recovery context menu; completion is ignored there.

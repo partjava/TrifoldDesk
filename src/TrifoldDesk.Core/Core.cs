@@ -17,6 +17,7 @@ public sealed class ShortcutItem
     public string ChildFolderId { get; set; } = "";
     public string LaunchMode { get; set; } = "shell";
     public string ExecutablePath { get; set; } = "";
+    public bool RunAsAdmin { get; set; }
 }
 public sealed class ShortcutConfig { public int SchemaVersion { get; set; } = 2; public List<ShortcutItem> Items { get; set; } = []; }
 public sealed class AppSettings

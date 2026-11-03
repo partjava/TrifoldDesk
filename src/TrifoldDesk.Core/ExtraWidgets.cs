@@ -161,10 +161,12 @@ public sealed class HangingPhotoItem
     public string ImagePath { get; set; } = "";
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public double TiltDegrees { get; set; }
+    public double Scale { get; set; } = 1.0;
 }
 public sealed class PhotoLineData
 {
     public bool AutoWatchScreenshots { get; set; }
+    public bool AutoWatchClipboard { get; set; }
     public List<HangingPhotoItem> Items { get; set; } = [];
 }
 public sealed class PhotoLineConfig
@@ -183,7 +185,7 @@ public static class PhotoLineRules
         double normalized = (Math.Abs(hash % 1000) / 999.0) * 6.4 - 3.2;
         return Math.Abs(normalized) < 0.6 ? (normalized < 0 ? -1.2 : 1.2) : Math.Round(normalized, 1);
     }
-    public static PhotoLineData AddPhoto(PhotoLineData state, string imagePath, string? title = null, string? id = null)
+    public static PhotoLineData AddPhoto(PhotoLineData state, string imagePath, string? title = null, string? id = null, double scale = 1.0)
     {
         if (string.IsNullOrWhiteSpace(imagePath)) throw new ArgumentException("截图路径不能为空。", nameof(imagePath));
         var next = Clone(state); next.Items ??= [];
@@ -197,7 +199,8 @@ public static class PhotoLineRules
             Title = label,
             ImagePath = imagePath,
             CreatedUtc = DateTime.UtcNow,
-            TiltDegrees = DefaultTilt(itemId)
+            TiltDegrees = DefaultTilt(itemId),
+            Scale = Math.Clamp(scale, 0.5, 3.0)
         });
         while (next.Items.Count > MaxPhotos) next.Items.RemoveAt(next.Items.Count - 1);
         return next;
@@ -224,6 +227,19 @@ public static class PhotoLineRules
         var item = next.Items[from];
         next.Items.RemoveAt(from);
         next.Items.Insert(to, item);
+        return next;
+    }
+    public static PhotoLineData SetScale(PhotoLineData state, string id, double scale)
+    {
+        var next = Clone(state); next.Items ??= [];
+        var item = next.Items.FirstOrDefault(i => i != null && i.Id == id);
+        if (item != null) item.Scale = Math.Clamp(scale, 0.5, 3.0);
+        return next;
+    }
+    public static PhotoLineData ClearPhotos(PhotoLineData state)
+    {
+        var next = Clone(state); next.Items ??= [];
+        next.Items.Clear();
         return next;
     }
     public static PhotoLineData Clone(PhotoLineData state) => JsonSerializer.Deserialize<PhotoLineData>(JsonSerializer.Serialize(state ?? new PhotoLineData()))!;

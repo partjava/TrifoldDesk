@@ -7,11 +7,11 @@ internal static class TextContrast
     {
         var effect = new System.Windows.Media.Effects.DropShadowEffect
         {
-            Color = Color.FromRgb(10, 18, 26),
-            BlurRadius = 5,
-            ShadowDepth = 1,
+            Color = Color.FromRgb(15, 20, 25),
+            BlurRadius = 3.5,
+            ShadowDepth = 1.0,
             Direction = 315,
-            Opacity = 0.88
+            Opacity = 0.75
         };
         effect.Freeze();
         return effect;

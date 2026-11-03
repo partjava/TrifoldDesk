@@ -29,6 +29,9 @@ public static class ScriptLaunchTests
             item.SourcePath=pyDir;denied=false;try{ScriptLaunchRules.Create(item);}catch(ArgumentException){denied=true;}check(denied,"Python mode rejects a directory with .py extension");
             var shellUriPlan=ScriptLaunchRules.Create(new ShortcutItem{SourcePath=@"shell:AppsFolder\Example",LaunchMode="shell"});
             check(shellUriPlan.UseShellExecute&&shellUriPlan.FileName==@"shell:AppsFolder\Example","shell launch mode allows shell: URI targets");
+            item.RunAsAdmin = true;
+            var roundtrip = System.Text.Json.JsonSerializer.Deserialize<ShortcutItem>(System.Text.Json.JsonSerializer.Serialize(item))!;
+            check(roundtrip.RunAsAdmin, "run-as-admin preference roundtrips through JSON serialization");
         }
         finally{Directory.Delete(root,true);}
     }

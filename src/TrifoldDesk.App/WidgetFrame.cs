@@ -49,7 +49,7 @@ public sealed class WidgetFrame : Border
         if (body is FolderWidget folderBody) { folderBody.ExpandRequested += ToggleCollapsed; folderBody.ContentChanged += () => Constrain(false); folderBody.EdgeExpansionRequested+=ExpandFolderEdge;folderBody.EdgeExpansionFinished+=FinishFolderEdge; }
         CornerRadius = new CornerRadius(18); BorderThickness = new Thickness(1); BorderBrush = new SolidColorBrush(Color.FromArgb(70, 255, 255, 255));
         if (model.PluginId is "apps" or "projects") { CornerRadius = new CornerRadius(0); BorderThickness = new Thickness(0); Background = Brushes.Transparent; }
-        bool themed = model.PluginId is "system-summary" or "cpu" or "memory" or "network" or "gpu" or "clock" or "battery" or "calendar" or "photo-line";
+        bool themed = model.PluginId is "system-summary" or "cpu" or "memory" or "network" or "gpu" or "clock" or "battery" or "calendar" or "photo-line" or "workbench" or "weather" or "music" or "project-browser";
         if (themed && model.Style is "paper" or "neon") Background = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(model.Style == "paper" ? "#F8F1E4" : "#E62E214C"), (Color)ColorConverter.ConvertFromString(model.Style == "paper" ? "#E8EEE8" : "#D416253E"), 50);
         else Background = Brushes.Transparent; ClipToBounds = true;
         if (themed && model.Style == "ink") BorderBrush = new SolidColorBrush(Color.FromArgb(65, 30, 48, 60));

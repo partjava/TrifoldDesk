@@ -164,6 +164,15 @@ public sealed class FolderWidget : Grid
             button.Click += (_, _) => { if (_dragged) { _dragged = false; return; } try { if(!string.IsNullOrEmpty(item.ChildFolderId)||(_mappedReadOnly&&Directory.Exists(item.SourcePath)))FolderOpenRequested?.Invoke(item);else ShellLinkHelper.Launch(item); } catch (Exception ex) { App.Log(ex); MessageBox.Show(Window.GetWindow(this), ex.Message, "入口无法打开"); } };
             button.Tag=index; button.Drop += (_, e) => DropAt(e,(int)button.Tag);
             var menu = new ContextMenu(); button.ContextMenu = menu;
+            var open = new MenuItem { Header = "打开" };
+            open.Click += (_, _) => { try { if(!string.IsNullOrEmpty(item.ChildFolderId)||(_mappedReadOnly&&Directory.Exists(item.SourcePath)))FolderOpenRequested?.Invoke(item);else ShellLinkHelper.Launch(item); } catch (Exception ex) { App.Log(ex); MessageBox.Show(Window.GetWindow(this), ex.Message, "入口无法打开"); } };
+            menu.Items.Add(open);
+            var runAsAdmin = new MenuItem { Header = "🛡 以管理员身份运行" };
+            runAsAdmin.Click += (_, _) => { try { ShellLinkHelper.Launch(item, true); } catch (Exception ex) { App.Log(ex); MessageBox.Show(Window.GetWindow(this), ex.Message, "无法以管理员身份启动"); } };
+            menu.Items.Add(runAsAdmin);
+            var showFolder = new MenuItem { Header = "打开所在位置" };
+            showFolder.Click += (_, _) => { try { ShellLinkHelper.ShowInFolder(item); } catch (Exception ex) { App.Log(ex); MessageBox.Show(Window.GetWindow(this), ex.Message, "无法打开位置"); } };
+            menu.Items.Add(showFolder);
             var launchSettings = new MenuItem { Header = "启动方式…" }; launchSettings.Click+=(_,_)=>LaunchSettingsRequested?.Invoke(item); menu.Items.Add(launchSettings);
             var delete = new MenuItem { Header = "从文件夹移除（保留源文件）" }; delete.Click += (_, _) => _remove(item.Id); menu.Items.Add(delete);
             foreach (int screen in new[] { 0, 1 }) { int target = screen; var move = new MenuItem { Header = screen == 0 ? "移出到应用库" : "移出到资料库" }; move.Click += (_, _) => _export(item.Id, target); menu.Items.Add(move); }

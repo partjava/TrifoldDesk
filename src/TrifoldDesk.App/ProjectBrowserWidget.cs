@@ -9,6 +9,7 @@ public sealed class ProjectBrowserWidget : Grid, IProfileReplacementParticipant
 {
     private readonly string _instanceId;
     private readonly ConfigManager _store;
+    private readonly string _style;
     private string _rootPath = "";
     private readonly TreeView _tree = new() { Background = Brushes.Transparent, Foreground = Brushes.WhiteSmoke, BorderThickness = new Thickness(0) };
     private readonly TextBlock _status = new() { Foreground = Brushes.LightGray, FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(4, 4, 4, 8) };
@@ -19,9 +20,18 @@ public sealed class ProjectBrowserWidget : Grid, IProfileReplacementParticipant
     private DateTime _lastGitAttempt;
     private bool _gitBusy;
     private bool _retired;
-    public ProjectBrowserWidget(string instanceId, ConfigManager store)
+    public ProjectBrowserWidget(string instanceId, ConfigManager store, string style = "glass")
     {
-        _instanceId = instanceId; _store = store;
+        _instanceId = instanceId; _store = store; _style = style;
+        bool darkText = TextContrast.IsDarkTextStyle(style);
+        _tree.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(darkText ? "#1E353D" : "#F4F8FA"));
+        _status.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(darkText ? "#48606A" : "#D8E6EE"));
+        _git.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(darkText ? "#267E73" : "#74E1D1"));
+        if (style == "glass")
+        {
+            _status.Effect = TextContrast.Shadow;
+            _git.Effect = TextContrast.Shadow;
+        }
         RowDefinitions.Add(new() { Height = GridLength.Auto }); RowDefinitions.Add(new()); RowDefinitions.Add(new() { Height = GridLength.Auto });
         Children.Add(_status); Grid.SetRow(_tree, 1); Children.Add(_tree); Grid.SetRow(_git, 2); Children.Add(_git);
         try { var loaded = store.Load<ProjectBrowserConfig>("optional-projects.json"); if (loaded.Value.Widgets?.TryGetValue(instanceId, out var data) == true) _rootPath = data.RootPath ?? ""; _status.Text = loaded.Warning ?? ""; }
@@ -71,8 +81,37 @@ public sealed class ProjectBrowserWidget : Grid, IProfileReplacementParticipant
     }
     private TreeViewItem Node(MappedDirectoryEntry entry, CancellationToken token)
     {
-        var node = new TreeViewItem { Header = entry.Name, Tag = entry, ToolTip = entry.Path, Foreground = Brushes.WhiteSmoke };
-        var menu = new ContextMenu(); Menu(menu, "打开", () => { Open(entry.Path); return Task.CompletedTask; }); node.ContextMenu = menu;
+        bool dark = TextContrast.IsDarkTextStyle(_style);
+        var node = new TreeViewItem
+        {
+            Header = entry.Name,
+            Tag = entry,
+            ToolTip = entry.Path,
+            Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(dark ? "#1E353D" : "#F4F8FA"))
+        };
+        node.PreviewMouseDoubleClick += (_, e) =>
+        {
+            if (!entry.IsDirectory)
+            {
+                Open(entry.Path);
+                e.Handled = true;
+            }
+        };
+        var menu = new ContextMenu();
+        Menu(menu, "打开", () => { Open(entry.Path); return Task.CompletedTask; });
+        Menu(menu, "在资源管理器中显示", () =>
+        {
+            try
+            {
+                if (File.Exists(entry.Path))
+                    Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + Path.GetFullPath(entry.Path) + "\"") { UseShellExecute = true });
+                else if (Directory.Exists(entry.Path))
+                    Process.Start(new ProcessStartInfo("explorer.exe", "\"" + Path.GetFullPath(entry.Path) + "\"") { UseShellExecute = true });
+            }
+            catch (Exception ex) { App.Log(ex); }
+            return Task.CompletedTask;
+        });
+        node.ContextMenu = menu;
         if (entry.IsDirectory && !entry.IsReparsePoint)
         {
             node.Items.Add(new TreeViewItem { Header = "加载中…" });

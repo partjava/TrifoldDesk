@@ -60,12 +60,13 @@ public static class ShellLinkHelper
         return !Path.IsPathFullyQualified(target) || File.Exists(target) || Directory.Exists(target);
     }
     public static bool SourceExists(ShortcutItem item) => File.Exists(item.SourcePath) || Directory.Exists(item.SourcePath);
-    public static void Launch(ShortcutItem item)
+    public static void Launch(ShortcutItem item, bool forceAdmin = false)
     {
         if (!SourceExists(item)) throw new FileNotFoundException("入口已失效，请右键重新定位。", item.SourcePath);
         // Shell owns link arguments, working directory, elevation and special targets.
         var plan = ScriptLaunchRules.Create(item);
-        var start = new ProcessStartInfo { FileName = plan.FileName, UseShellExecute = plan.UseShellExecute, WorkingDirectory = plan.WorkingDirectory };
+        bool elevate = forceAdmin || item.RunAsAdmin;
+        var start = new ProcessStartInfo { FileName = plan.FileName, UseShellExecute = elevate || plan.UseShellExecute, WorkingDirectory = plan.WorkingDirectory, Verb = elevate ? "runas" : "" };
         foreach (string argument in plan.ArgumentList) start.ArgumentList.Add(argument);
         Process.Start(start);
     }

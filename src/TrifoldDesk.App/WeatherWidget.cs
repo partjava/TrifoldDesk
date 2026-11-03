@@ -20,9 +20,15 @@ public sealed class WeatherWidget : StackPanel, IProfileReplacementParticipant
     private bool _busy;
     private bool _retired;
     private string? _readWarning;
-    public WeatherWidget(string instanceId, ConfigManager store)
+    public WeatherWidget(string instanceId, ConfigManager store, string style = "glass")
     {
         _instanceId = instanceId; _store = store; Margin = new Thickness(6);
+        bool darkText = TextContrast.IsDarkTextStyle(style);
+        _city.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(darkText ? "#1E353D" : "#F4F8FA"));
+        _temperature.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(darkText ? "#12252C" : "#FFFFFF"));
+        _detail.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(darkText ? "#48606A" : "#D8E6EE"));
+        _status.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(darkText ? "#5A727C" : "#C0D4DE"));
+        if (style == "glass") { _city.Effect = TextContrast.Shadow; _temperature.Effect = TextContrast.Shadow; _detail.Effect = TextContrast.Shadow; _status.Effect = TextContrast.Shadow; }
         try { var loaded = store.Load<WeatherConfig>("optional-weather.json"); if (loaded.Value.Widgets?.TryGetValue(instanceId, out var saved) == true) _data = saved; _readWarning = loaded.Warning; _status.Text = loaded.Warning ?? ""; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { _status.Text = "读取失败：" + ex.Message; }
         Children.Add(_city); Children.Add(_temperature); Children.Add(_detail); Children.Add(_status);

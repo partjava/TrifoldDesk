@@ -176,6 +176,11 @@ public partial class MainWindow : Window
         return (ShortcutViewModel)((FrameworkElement)menu.PlacementTarget).DataContext;
     }
     private void MenuOpen(object sender, RoutedEventArgs e) => Launch(ContextItem(sender));
+    private void MenuRunAsAdmin(object sender, RoutedEventArgs e)
+    {
+        try { ShellLinkHelper.Launch(ContextItem(sender).Item, true); _viewModel.Status = "已以管理员身份打开 " + ContextItem(sender).Name; }
+        catch (Exception ex) { Fail("无法以管理员身份启动", ex); }
+    }
     private void MenuShowFolder(object sender, RoutedEventArgs e) { try { ShellLinkHelper.ShowInFolder(ContextItem(sender).Item); } catch (Exception ex) { Fail("无法打开位置", ex); } }
     private void MenuRemove(object sender, RoutedEventArgs e)
     {

@@ -117,10 +117,10 @@ public partial class MainWindow
                 }
                 else if (item.PluginId is "cpu" or "memory" or "network" or "gpu" or "clock" or "battery") { var dashboard = new DashboardWidget(item.PluginId, item.Style, _viewModel); _dashboards[item.PluginId] = dashboard; body = dashboard; }
                 else if (item.PluginId == "external-plugin")body=new ExternalPluginWidget(item.ExternalPluginId,_config);
-                else if (item.PluginId == "workbench")body=new ProductivityWidget(item.InstanceId,_config);
-                else if (item.PluginId == "weather")body=new WeatherWidget(item.InstanceId,_config);
-                else if (item.PluginId == "music")body=new MusicWidget(item.InstanceId,_config);
-                else if (item.PluginId == "project-browser")body=new ProjectBrowserWidget(item.InstanceId,_config);
+                else if (item.PluginId == "workbench")body=new ProductivityWidget(item.InstanceId,_config,item.Style);
+                else if (item.PluginId == "weather")body=new WeatherWidget(item.InstanceId,_config,item.Style);
+                else if (item.PluginId == "music")body=new MusicWidget(item.InstanceId,_config,item.Style);
+                else if (item.PluginId == "project-browser")body=new ProjectBrowserWidget(item.InstanceId,_config,item.Style);
                 else if (item.PluginId == "photo-line")body=new PhotoClotheslineWidget(item.InstanceId,_config,item.Style);
                 else if (item.PluginId == "system-summary") body = new CombinedStatusWidget(item, _viewModel);
                 else body = _widgetContents[item.PluginId];

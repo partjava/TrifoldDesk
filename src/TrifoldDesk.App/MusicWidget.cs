@@ -16,7 +16,7 @@ public sealed class MusicWidget : Border, IProfileReplacementParticipant
     private bool _active, _queued, _refreshAgain;
     private bool _retired;
     private int _generation;
-    public MusicWidget(string instanceId, ConfigManager store)
+    public MusicWidget(string instanceId, ConfigManager store, string style = "glass")
     {
         ArgumentNullException.ThrowIfNull(store);
         _instanceId = instanceId;
@@ -26,7 +26,38 @@ public sealed class MusicWidget : Border, IProfileReplacementParticipant
         var art = new Grid { Width = 92, Height = 92, VerticalAlignment = VerticalAlignment.Top };
         art.Children.Add(new Border { Background = new SolidColorBrush(Color.FromArgb(35, 120, 160, 180)), CornerRadius = new CornerRadius(8) });
         art.Children.Add(new TextBlock { Text = "♪", FontSize = 42, Foreground = Brushes.Gray, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }); art.Children.Add(_cover); root.Children.Add(art);
-        var text = new StackPanel(); text.Children.Add(_title); text.Children.Add(_artist); text.Children.Add(_status); Grid.SetColumn(text, 1); root.Children.Add(text); Child = root;
+        bool darkText = TextContrast.IsDarkTextStyle(style);
+        _title.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(darkText ? "#1E353D" : "#FFFFFF"));
+        _artist.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(darkText ? "#48606A" : "#E2EEF5"));
+        _status.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(darkText ? "#5A727C" : "#B8CBD6"));
+        if (style == "glass")
+        {
+            _title.Effect = TextContrast.Shadow;
+            _artist.Effect = TextContrast.Shadow;
+            _status.Effect = TextContrast.Shadow;
+        }
+        var controls = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
+        Button ControlButton(string symbol, string tooltip) => new Button
+        {
+            Content = new TextBlock { Text = symbol, FontSize = 12, Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(darkText ? "#1E353D" : "#F0F7FA")) },
+            ToolTip = tooltip,
+            Width = 32,
+            Height = 24,
+            Padding = new Thickness(0),
+            Margin = new Thickness(0, 0, 6, 0),
+            Background = new SolidColorBrush(darkText ? Color.FromArgb(28, 30, 50, 60) : Color.FromArgb(28, 255, 255, 255)),
+            BorderBrush = new SolidColorBrush(darkText ? Color.FromArgb(75, 30, 50, 60) : Color.FromArgb(65, 255, 255, 255))
+        };
+        var prevBtn = ControlButton("⏮", "上一首");
+        var playBtn = ControlButton("⏯", "播放 / 暂停");
+        var nextBtn = ControlButton("⏭", "下一首");
+        prevBtn.Click += async (_, _) => { var s = _session; if (s != null) try { await s.TrySkipPreviousAsync(); QueueRefresh(); } catch { } };
+        playBtn.Click += async (_, _) => { var s = _session; if (s != null) try { await s.TryTogglePlayPauseAsync(); QueueRefresh(); } catch { } };
+        nextBtn.Click += async (_, _) => { var s = _session; if (s != null) try { await s.TrySkipNextAsync(); QueueRefresh(); } catch { } };
+        controls.Children.Add(prevBtn);
+        controls.Children.Add(playBtn);
+        controls.Children.Add(nextBtn);
+        var text = new StackPanel(); text.Children.Add(_title); text.Children.Add(_artist); text.Children.Add(controls); text.Children.Add(_status); Grid.SetColumn(text, 1); root.Children.Add(text); Child = root;
         ContextMenu = new ContextMenu(); ContextMenu.Opened += (_, _) => BuildMenu();
         Loaded += OnLoaded; Unloaded += OnUnloaded; Empty("暂无系统媒体会话");
     }

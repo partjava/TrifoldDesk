@@ -55,5 +55,9 @@ public static class ExtraWidgetTests
         var renamedPhotos = PhotoLineRules.RenamePhoto(reorderedPhotos, "p1", "接口参考图");
         var afterRemove = PhotoLineRules.RemovePhoto(renamedPhotos, "p2");
         check(afterRemove.Items.Single().Title == "接口参考图" && photoLine.Items.Count == 2, "renaming and removing hanging photos preserves immutability");
+        var scaled = PhotoLineRules.SetScale(afterRemove, "p1", 1.8);
+        check(scaled.Items.Single().Scale == 1.8 && afterRemove.Items.Single().Scale == 1.0, "scaling card preserves immutability");
+        var cleared = PhotoLineRules.ClearPhotos(scaled);
+        check(cleared.Items.Count == 0 && scaled.Items.Count == 1, "clearing hanging photos empties rope without mutating prior state");
     }
 }

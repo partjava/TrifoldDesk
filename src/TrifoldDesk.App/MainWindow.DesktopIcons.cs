@@ -93,10 +93,48 @@ public partial class MainWindow
                 _dragging=true;try{DragDrop.DoDragDrop(button,data,DragDropEffects.Move|DragDropEffects.Copy);}finally{_dragging=false;_leftAt=DateTime.UtcNow;EndFolderEdgeDrags();ShowDesktopStackTarget(null);}e.Handled=true;
             };
             button.PreviewMouseLeftButtonUp+=(_,e)=>{var p=e.GetPosition(button);button.ReleaseMouseCapture();e.Handled=true;if(!dragging&&p.X>=0&&p.Y>=0&&p.X<button.ActualWidth&&p.Y<button.ActualHeight){try{if(!string.IsNullOrEmpty(entry.Item.ChildFolderId))OpenDesktopFolder(entry);else ShellLinkHelper.Launch(entry.Item);}catch(Exception ex){Fail("入口无法打开",ex);}}};
-            var menu=new ContextMenu();var remove=new MenuItem{Header="移除图标（保留源文件）"};menu.Items.Add(remove);button.ContextMenu=menu;
+            var menu=new ContextMenu();
+            var open=new MenuItem{Header="打开"};
+            open.Click+=(_,_)=>{try{if(!string.IsNullOrEmpty(entry.Item.ChildFolderId))OpenDesktopFolder(entry);else ShellLinkHelper.Launch(entry.Item);}catch(Exception ex){Fail("入口无法打开",ex);}};
+            menu.Items.Add(open);
+            var runAsAdmin=new MenuItem{Header="🛡 以管理员身份运行"};
+            runAsAdmin.Click+=(_,_)=>{try{ShellLinkHelper.Launch(entry.Item,true);}catch(Exception ex){Fail("无法以管理员身份启动",ex);}};
+            menu.Items.Add(runAsAdmin);
+            var showFolder=new MenuItem{Header="打开所在位置"};
+            showFolder.Click+=(_,_)=>{try{ShellLinkHelper.ShowInFolder(entry.Item);}catch(Exception ex){Fail("无法打开位置",ex);}};
+            menu.Items.Add(showFolder);
+            var rename=new MenuItem{Header="重命名"};
+            rename.Click+=(_,_)=>RenameDesktopEntry(entry);
+            menu.Items.Add(rename);
+            var launchSettings=new MenuItem{Header="启动方式…"};
+            launchSettings.Click+=(_,_)=>EditDesktopLaunch(entry);
+            menu.Items.Add(launchSettings);
+            menu.Items.Add(new Separator());
+            var remove=new MenuItem{Header="移除图标（保留源文件）"};
             remove.Click+=(_,_)=>{var next=FolderRules.Clone(_folders);next.DesktopEntries.RemoveAll(d=>d.Item.Id==entry.Item.Id);SaveFolders(next);};
+            menu.Items.Add(remove);
+            button.ContextMenu=menu;
             Canvas.SetLeft(button,bounds.X);Canvas.SetTop(button,bounds.Y);Panel.SetZIndex(button,1000);WidgetCanvas.Children.Add(button);_desktopIcons.Add(button);
         }
+    }
+    private void RenameDesktopEntry(DesktopEntry entry)
+    {
+        _dialogOpen = true;
+        try
+        {
+            string? name = TextInputDialog.Ask(this, "重命名桌面图标", entry.Item.Name);
+            if (name != null && !string.IsNullOrWhiteSpace(name))
+            {
+                var next = FolderRules.Clone(_folders);
+                var target = next.DesktopEntries.FirstOrDefault(d => d.Item.Id == entry.Item.Id);
+                if (target != null)
+                {
+                    target.Item.Name = name.Trim();
+                    SaveFolders(next);
+                }
+            }
+        }
+        finally { _dialogOpen = false; _leftAt = DateTime.UtcNow; }
     }
     private void OpenDesktopFolder(DesktopEntry entry)
     {
