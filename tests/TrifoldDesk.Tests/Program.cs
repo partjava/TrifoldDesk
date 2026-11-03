@@ -124,6 +124,7 @@ try
     PluginProtocolTests.Run(Check);
     ProfilePackageTests.Run(Check);
     LegacyMigrationTests.Run(Check);
+    DockTests.Run(Check);
     Console.WriteLine($"{passed} checks passed.");
 }
 finally { Directory.Delete(root, true); }

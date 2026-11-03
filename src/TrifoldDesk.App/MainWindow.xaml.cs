@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     internal string SelectedGpuId => _settings.SelectedGpuId;
     internal bool AnimationsAllowed => _settings.AnimationsEnabled;
     private readonly HandleWindow _handle;
+    private readonly DockBarWindow _dock;
     private readonly SystemMonitorService _monitor;
     private readonly DiskMonitorService _disks;
     private readonly SystemActionService _actions = new();
@@ -48,6 +49,7 @@ public partial class MainWindow : Window
         { try { Collection(item.ScreenIndex).Add(new ShortcutViewModel(item)); } catch (Exception ex) { App.Log(ex); _loadWarning += "\n部分入口加载失败，请检查日志。"; } }
         _viewModel.RebuildLibrary();
         _handle = new HandleWindow { Topmost = _settings.AlwaysOnTop };
+        _dock = new DockBarWindow(_config);
         _handle.ToggleRequested += () => { if (_collapsed) Reveal(); else SetCollapsed(true); };
         _handle.RevealRequested += Reveal; _handle.SettingsRequested += OpenSettings; _handle.ExitRequested += Exit;
         _hoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
@@ -67,6 +69,7 @@ public partial class MainWindow : Window
         Loaded += (_, _) =>
         {
             _handle.Show(); Dock(); SetCollapsed(_settings.IsCollapsed, false);
+            if (!App.IsSelfTest) _dock.Show();
             if(!_settings.AlwaysOnTop) { WindowDockService.KeepAtDesktop(this);WindowDockService.KeepAtDesktop(_handle); }
             if (!string.IsNullOrWhiteSpace(_loadWarning)) { MessageBox.Show(this, _loadWarning, "配置恢复提示"); _viewModel.Status = "配置读取异常，原文件已保留。"; }
             ApplyDesktopHost();
@@ -346,7 +349,7 @@ public partial class MainWindow : Window
         try { _actions.Dispose(); } catch (Exception ex) { App.Log(ex); }
         DesktopHostService.Detach(this);
         _reminders.Dispose();
-        _tray.Dispose(); _handle.Close(); Close(); Application.Current.Shutdown();
+        _tray.Dispose(); _handle.Close(); _dock.Close(); Close(); Application.Current.Shutdown();
     }
     private void WindowClosing(object? sender, CancelEventArgs e) { if (!_closing) { e.Cancel = true; SetCollapsed(true); } }
     internal bool HandleIsVisible => _handle.IsVisible;
