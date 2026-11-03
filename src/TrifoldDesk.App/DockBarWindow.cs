@@ -147,21 +147,22 @@ public sealed class DockBarWindow : Window
     {
         _pill.CornerRadius = new CornerRadius(24);
         _pill.Padding = new Thickness(10, 5, 10, 5);
+        // Crystal-clear frosted glass background (transparent aesthetic requested)
         _pill.Background = new LinearGradientBrush(
-            Color.FromArgb(70, 24, 32, 46),
-            Color.FromArgb(92, 12, 16, 24),
+            Color.FromArgb(28, 255, 255, 255),
+            Color.FromArgb(12, 255, 255, 255),
             90);
         _pill.BorderBrush = new LinearGradientBrush(
-            Color.FromArgb(150, 255, 255, 255),
+            Color.FromArgb(120, 255, 255, 255),
             Color.FromArgb(35, 255, 255, 255),
             45);
-        _pill.BorderThickness = new Thickness(1.4);
+        _pill.BorderThickness = new Thickness(1.2);
         _pill.Effect = new DropShadowEffect
         {
-            BlurRadius = 32,
-            ShadowDepth = 6,
+            BlurRadius = 22,
+            ShadowDepth = 4,
             Direction = 270,
-            Opacity = 0.42,
+            Opacity = 0.20,
             Color = Colors.Black
         };
 
@@ -223,7 +224,7 @@ public sealed class DockBarWindow : Window
         var resetDefaults = new MenuItem { Header = "恢复默认应用列表" };
         resetDefaults.Click += (_, _) =>
         {
-            _config.Items = DockRules.CreateDefault().Items;
+            _config = DockRules.CreateDefault();
             SaveConfig();
             Render();
         };
@@ -419,7 +420,6 @@ public sealed class DockBarWindow : Window
         }
         else
         {
-            // Crisp fallback tile if icon could not be extracted (never leave an invisible blank box)
             var fallback = new Border
             {
                 Width = 36,
@@ -704,7 +704,8 @@ public sealed class DockBarWindow : Window
         double logicalAreaBottom = area.Bottom / dpiY;
 
         double x = logicalAreaLeft + (logicalAreaWidth - ActualWidth) / 2;
-        double y = logicalAreaBottom - ActualHeight - 8;
+        // Floated ~1 cm (48px) above bottom of screen/working area as requested
+        double y = logicalAreaBottom - ActualHeight - 48;
 
         Left = Math.Round(x);
         _normalTop = Math.Round(y);
