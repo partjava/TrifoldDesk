@@ -22,6 +22,8 @@ public sealed class LaunchpadWindow : Window
     private List<InstalledApp> _filteredApps = [];
     private int _currentPage;
     private bool _loading;
+    private bool _isOpen;
+    private DateTime _lastToggleAt = DateTime.MinValue;
 
     private readonly Border _glass = new();
     private readonly UniformGrid _grid = new() { Columns = Columns, Rows = Rows, Margin = new Thickness(14, 4, 14, 6) };
@@ -63,12 +65,15 @@ public sealed class LaunchpadWindow : Window
             e.Handled = true;
         };
 
-        Deactivated += (_, _) => Dismiss();
+        Deactivated += (_, _) =>
+        {
+            if ((DateTime.UtcNow - _lastToggleAt).TotalMilliseconds < 220) return;
+            Dismiss();
+        };
     }
 
     private void BuildUI()
     {
-        // Frosted glass frame
         _glass.CornerRadius = new CornerRadius(28);
         _glass.Background = new LinearGradientBrush(
             Color.FromArgb(75, 24, 32, 46),
@@ -94,7 +99,6 @@ public sealed class LaunchpadWindow : Window
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(44) });
 
-        // Specular top highlight line
         var topShine = new Border
         {
             Height = 1.2,
@@ -116,19 +120,16 @@ public sealed class LaunchpadWindow : Window
         Grid.SetRowSpan(topShine, 3);
         mainGrid.Children.Add(topShine);
 
-        // Row 0: Search bar
         var searchBar = BuildSearchBar();
         Grid.SetRow(searchBar, 0);
         mainGrid.Children.Add(searchBar);
 
-        // Row 1: App Grid & Status
         var gridHost = new Grid();
         gridHost.Children.Add(_statusText);
         gridHost.Children.Add(_grid);
         Grid.SetRow(gridHost, 1);
         mainGrid.Children.Add(gridHost);
 
-        // Row 2: Pagination Bar
         var paginationBar = BuildPaginationBar();
         Grid.SetRow(paginationBar, 2);
         mainGrid.Children.Add(paginationBar);
@@ -258,7 +259,10 @@ public sealed class LaunchpadWindow : Window
 
     public async void Toggle()
     {
-        if (IsVisible)
+        if ((DateTime.UtcNow - _lastToggleAt).TotalMilliseconds < 220) return;
+        _lastToggleAt = DateTime.UtcNow;
+
+        if (_isOpen)
         {
             Dismiss();
         }
@@ -274,6 +278,8 @@ public sealed class LaunchpadWindow : Window
 
     private void ShowLaunchpad()
     {
+        _isOpen = true;
+        BeginAnimation(OpacityProperty, null);
         Opacity = 0;
         Show();
         Activate();
@@ -281,19 +287,33 @@ public sealed class LaunchpadWindow : Window
 
         var anim = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(160))
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+            FillBehavior = FillBehavior.Stop
+        };
+        anim.Completed += (_, _) =>
+        {
+            BeginAnimation(OpacityProperty, null);
+            Opacity = 1.0;
         };
         BeginAnimation(OpacityProperty, anim);
     }
 
     public void Dismiss()
     {
-        if (!IsVisible) return;
+        if (!_isOpen) return;
+        _isOpen = false;
+
         var anim = new DoubleAnimation(0.0, TimeSpan.FromMilliseconds(120))
         {
-            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn },
+            FillBehavior = FillBehavior.Stop
         };
-        anim.Completed += (_, _) => Hide();
+        anim.Completed += (_, _) =>
+        {
+            BeginAnimation(OpacityProperty, null);
+            Opacity = 0;
+            Hide();
+        };
         BeginAnimation(OpacityProperty, anim);
     }
 
@@ -345,12 +365,12 @@ public sealed class LaunchpadWindow : Window
     private void RenderPage()
     {
         _grid.Children.Clear();
-
-        if (_loading) return;
+        _statusText.Visibility = Visibility.Collapsed;
+        _grid.Visibility = Visibility.Visible;
 
         if (_filteredApps.Count == 0)
         {
-            _statusText.Text = _allApps.Count == 0 ? "未发现已安装应用" : "未找到匹配的应用";
+            _statusText.Text = _loading ? "正在读取应用…" : "未搜索到匹配的应用";
             _statusText.Visibility = Visibility.Visible;
             _grid.Visibility = Visibility.Collapsed;
             _pageLabel.Text = "0 / 0";
@@ -359,9 +379,6 @@ public sealed class LaunchpadWindow : Window
             return;
         }
 
-        _statusText.Visibility = Visibility.Collapsed;
-        _grid.Visibility = Visibility.Visible;
-
         int totalPages = Math.Max(1, (int)Math.Ceiling(_filteredApps.Count / (double)PageSize));
         _currentPage = Math.Clamp(_currentPage, 0, totalPages - 1);
 
@@ -369,8 +386,12 @@ public sealed class LaunchpadWindow : Window
         _prevBtn.IsEnabled = _currentPage > 0;
         _nextBtn.IsEnabled = _currentPage < totalPages - 1;
 
+        var pageItems = _filteredApps
+            .Skip(_currentPage * PageSize)
+            .Take(PageSize)
+            .ToList();
+
         double dpi = VisualTreeHelper.GetDpi(this).DpiScaleX;
-        var pageItems = _filteredApps.Skip(_currentPage * PageSize).Take(PageSize).ToList();
 
         foreach (var app in pageItems)
         {
@@ -378,11 +399,9 @@ public sealed class LaunchpadWindow : Window
             _grid.Children.Add(cell);
         }
 
-        // Fill empty slots so grid cells don't stretch unevenly
-        int emptySlots = PageSize - pageItems.Count;
-        for (int i = 0; i < emptySlots; i++)
+        for (int i = pageItems.Count; i < PageSize; i++)
         {
-            _grid.Children.Add(new Border { Background = Brushes.Transparent });
+            _grid.Children.Add(new Border { Background = Brushes.Transparent, IsHitTestVisible = false });
         }
     }
 
@@ -390,11 +409,12 @@ public sealed class LaunchpadWindow : Window
     {
         var cell = new Border
         {
-            CornerRadius = new CornerRadius(13),
+            CornerRadius = new CornerRadius(14),
             Background = Brushes.Transparent,
-            Margin = new Thickness(3, 2, 3, 2),
             Cursor = Cursors.Hand,
-            ToolTip = app.DisplayName + "\n" + (string.IsNullOrEmpty(app.TargetPath) ? app.ShellPath : app.TargetPath),
+            ToolTip = app.Details,
+            Margin = new Thickness(4),
+            Padding = new Thickness(4, 6, 4, 6),
             RenderTransformOrigin = new Point(0.5, 0.5)
         };
         var scale = new ScaleTransform(1.0, 1.0);
@@ -403,17 +423,16 @@ public sealed class LaunchpadWindow : Window
         var stack = new StackPanel
         {
             HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(2)
+            VerticalAlignment = VerticalAlignment.Center
         };
 
         var icon = new Image
         {
             Source = ShellLinkHelper.GetShellAppIcon(app.ShellPath, dpi, 44),
-            Width = 44,
-            Height = 44,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(0, 2, 0, 4)
+            Width = 42,
+            Height = 42,
+            Margin = new Thickness(0, 0, 0, 4),
+            HorizontalAlignment = HorizontalAlignment.Center
         };
         RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
         stack.Children.Add(icon);
@@ -444,8 +463,9 @@ public sealed class LaunchpadWindow : Window
             cell.Background = Brushes.Transparent;
             AnimateScale(scale, 1.0);
         };
-        cell.MouseLeftButtonUp += (_, _) =>
+        cell.MouseLeftButtonUp += (_, e) =>
         {
+            e.Handled = true;
             AnimateClick(cell, () =>
             {
                 LaunchApp(app);
@@ -453,7 +473,6 @@ public sealed class LaunchpadWindow : Window
             });
         };
 
-        // Context Menu
         var menu = new ContextMenu();
         var open = new MenuItem { Header = "打开 " + app.DisplayName };
         open.Click += (_, _) => { LaunchApp(app); Dismiss(); };
@@ -559,10 +578,13 @@ public sealed class LaunchpadWindow : Window
     {
         if (element.RenderTransform is ScaleTransform scale)
         {
-            var down = new DoubleAnimation(0.93, TimeSpan.FromMilliseconds(70));
+            bool fired = false;
+            var down = new DoubleAnimation(0.93, TimeSpan.FromMilliseconds(65));
             down.Completed += (_, _) =>
             {
-                var up = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(120));
+                if (fired) return;
+                fired = true;
+                var up = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(110));
                 scale.BeginAnimation(ScaleTransform.ScaleXProperty, up);
                 scale.BeginAnimation(ScaleTransform.ScaleYProperty, up);
                 callback();

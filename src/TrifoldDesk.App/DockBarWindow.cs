@@ -20,7 +20,8 @@ public sealed class DockBarWindow : Window
     private DockConfig _config;
     private readonly StackPanel _itemsPanel = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly Border _pill = new();
-    private readonly DispatcherTimer _hideTimer = new() { Interval = TimeSpan.FromMilliseconds(550) };
+    private readonly DispatcherTimer _hideTimer = new() { Interval = TimeSpan.FromMilliseconds(450) };
+    private readonly DispatcherTimer _edgeTriggerTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private bool _isSlidDown;
     private double _normalTop;
 
@@ -45,6 +46,16 @@ public sealed class DockBarWindow : Window
             _config = PopulateInitialDock(_store);
             try { _store.Save("dock.json", _config); } catch { /* ignore */ }
         }
+        else
+        {
+            // Auto deduplicate any legacy duplicate entries
+            int beforeCount = _config.Items.Count;
+            _config = DockRules.Deduplicate(_config);
+            if (_config.Items.Count != beforeCount)
+            {
+                try { _store.Save("dock.json", _config); } catch { /* ignore */ }
+            }
+        }
 
         Topmost = _config.AlwaysOnTop;
 
@@ -53,7 +64,12 @@ public sealed class DockBarWindow : Window
         Loaded += (_, _) => Reposition();
         SizeChanged += (_, _) => Reposition();
         SystemEvents.DisplaySettingsChanged += OnDisplayChanged;
-        Closed += (_, _) => SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
+        Closed += (_, _) =>
+        {
+            SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
+            _hideTimer.Stop();
+            _edgeTriggerTimer.Stop();
+        };
 
         _hideTimer.Tick += (_, _) =>
         {
@@ -74,6 +90,44 @@ public sealed class DockBarWindow : Window
         {
             if (_config.AutoHide && !_isSlidDown) _hideTimer.Start();
         };
+
+        // Edge trigger monitor: when cursor approaches the screen bottom, reveal the dock smoothly
+        _edgeTriggerTimer.Tick += (_, _) =>
+        {
+            if (!_config.AutoHide) return;
+
+            var screen = Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
+            var pt = Forms.Cursor.Position;
+            var source = PresentationSource.FromVisual(this);
+            double dpiX = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+            double dpiY = source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+
+            int bottomThreshold = Math.Max(screen.WorkingArea.Bottom, screen.Bounds.Bottom) - 10;
+            bool isAtBottomEdge = pt.Y >= bottomThreshold;
+
+            double dockScreenLeft = Left * dpiX;
+            double dockScreenRight = (Left + ActualWidth) * dpiX;
+            bool isInHorizontalRange = pt.X >= (dockScreenLeft - 120) && pt.X <= (dockScreenRight + 120);
+
+            if (_isSlidDown && isAtBottomEdge && isInHorizontalRange)
+            {
+                SlideDock(false);
+            }
+            else if (!_isSlidDown && !IsMouseOver)
+            {
+                // Check if cursor has wandered away
+                double dockScreenTop = Top * dpiY;
+                double dockScreenBottom = (Top + ActualHeight) * dpiY;
+                bool isNearDock = pt.X >= (dockScreenLeft - 30) && pt.X <= (dockScreenRight + 30) &&
+                                  pt.Y >= (dockScreenTop - 40) && pt.Y <= (dockScreenBottom + 40);
+
+                if (!isNearDock && !_hideTimer.IsEnabled)
+                {
+                    _hideTimer.Start();
+                }
+            }
+        };
+        _edgeTriggerTimer.Start();
 
         AllowDrop = true;
         DragOver += (_, e) =>
@@ -184,7 +238,7 @@ public sealed class DockBarWindow : Window
     {
         var mainStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
 
-        // 1. Launchpad button
+        // 1. Launchpad button (9-dots button)
         var launchpadBtn = CreateLaunchpadButton();
         mainStack.Children.Add(launchpadBtn);
 
@@ -264,8 +318,9 @@ public sealed class DockBarWindow : Window
             btn.Background = Brushes.Transparent;
             AnimateScale(scale, 1.0);
         };
-        btn.MouseLeftButtonUp += (_, _) =>
+        btn.MouseLeftButtonUp += (_, e) =>
         {
+            e.Handled = true;
             AnimateClick(btn, () =>
             {
                 if (LaunchpadRequested != null)
@@ -323,7 +378,11 @@ public sealed class DockBarWindow : Window
             btn.Background = new SolidColorBrush(Color.FromArgb(24, 255, 255, 255));
             AnimateScale(scale, 1.0);
         };
-        btn.MouseLeftButtonUp += (_, _) => AnimateClick(btn, OpenInstalledAppsPicker);
+        btn.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            AnimateClick(btn, OpenInstalledAppsPicker);
+        };
 
         return btn;
     }
@@ -345,16 +404,47 @@ public sealed class DockBarWindow : Window
         container.RenderTransform = scale;
 
         var iconSource = GetDockIcon(item, dpi);
-        var icon = new Image
+        if (iconSource != null)
         {
-            Source = iconSource,
-            Width = 36,
-            Height = 36,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
-        container.Child = icon;
+            var icon = new Image
+            {
+                Source = iconSource,
+                Width = 36,
+                Height = 36,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
+            container.Child = icon;
+        }
+        else
+        {
+            // Crisp fallback tile if icon could not be extracted (never leave an invisible blank box)
+            var fallback = new Border
+            {
+                Width = 36,
+                Height = 36,
+                CornerRadius = new CornerRadius(9),
+                Background = new LinearGradientBrush(
+                    Color.FromArgb(180, 42, 60, 85),
+                    Color.FromArgb(220, 24, 36, 54),
+                    45),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255)),
+                BorderThickness = new Thickness(1)
+            };
+            string label = string.IsNullOrWhiteSpace(item.Name) ? "?" : item.Name.Substring(0, 1);
+            var initial = new TextBlock
+            {
+                Text = label,
+                FontSize = 15,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            fallback.Child = initial;
+            container.Child = fallback;
+        }
 
         container.MouseEnter += (_, _) =>
         {
@@ -366,8 +456,9 @@ public sealed class DockBarWindow : Window
             container.Background = Brushes.Transparent;
             AnimateScale(scale, 1.0);
         };
-        container.MouseLeftButtonUp += (_, _) =>
+        container.MouseLeftButtonUp += (_, e) =>
         {
+            e.Handled = true;
             AnimateClick(container, () => LaunchApp(item));
         };
 
@@ -427,30 +518,85 @@ public sealed class DockBarWindow : Window
         return container;
     }
 
+    private static string ResolveTargetPath(string target)
+    {
+        if (string.IsNullOrWhiteSpace(target)) return target;
+
+        if (string.Equals(target, "explorer.exe", StringComparison.OrdinalIgnoreCase) || string.Equals(target, "explorer", StringComparison.OrdinalIgnoreCase))
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
+        }
+        if (string.Equals(target, "taskmgr.exe", StringComparison.OrdinalIgnoreCase) || string.Equals(target, "taskmgr", StringComparison.OrdinalIgnoreCase))
+        {
+            return Path.Combine(Environment.SystemDirectory, "taskmgr.exe");
+        }
+        if (string.Equals(target, "msedge.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            string edge1 = @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe";
+            if (File.Exists(edge1)) return edge1;
+            string edge2 = @"C:\Program Files\Microsoft\Edge\Application\msedge.exe";
+            if (File.Exists(edge2)) return edge2;
+        }
+        if (string.Equals(target, "ms-settings:", StringComparison.OrdinalIgnoreCase) || string.Equals(target, "ms-settings", StringComparison.OrdinalIgnoreCase))
+        {
+            return "windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel";
+        }
+
+        if (!Path.IsPathRooted(target) && !target.StartsWith("shell:", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\" + target);
+                var val = key?.GetValue("") as string;
+                if (!string.IsNullOrEmpty(val) && File.Exists(val)) return val;
+            }
+            catch { /* ignore */ }
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\App Paths\" + target);
+                var val = key?.GetValue("") as string;
+                if (!string.IsNullOrEmpty(val) && File.Exists(val)) return val;
+            }
+            catch { /* ignore */ }
+        }
+
+        return target;
+    }
+
     private static ImageSource? GetDockIcon(DockItem item, double dpi)
     {
-        if (string.IsNullOrWhiteSpace(item.TargetPath)) return null;
-        if (item.TargetPath.StartsWith("shell:", StringComparison.OrdinalIgnoreCase) || !Path.IsPathRooted(item.TargetPath))
+        string path = ResolveTargetPath(item.TargetPath);
+        if (string.IsNullOrWhiteSpace(path)) return null;
+
+        if (path.StartsWith("shell:", StringComparison.OrdinalIgnoreCase) || !Path.IsPathRooted(path))
         {
-            return ShellLinkHelper.GetShellAppIcon(item.TargetPath, dpi, 40);
+            var shellIcon = ShellLinkHelper.GetShellAppIcon(path, dpi, 40);
+            if (shellIcon != null) return shellIcon;
         }
-        var shortcut = new ShortcutItem
+        else
         {
-            SourcePath = item.TargetPath,
-            TargetPath = item.TargetPath,
-            IconPath = item.IconPath,
-            IconIndex = item.IconIndex
-        };
-        return ShellLinkHelper.GetIcon(shortcut, dpi, 40) ?? ShellLinkHelper.GetShellAppIcon(item.TargetPath, dpi, 40);
+            var shortcut = new ShortcutItem
+            {
+                SourcePath = path,
+                TargetPath = path,
+                IconPath = string.IsNullOrEmpty(item.IconPath) ? path : item.IconPath,
+                IconIndex = item.IconIndex
+            };
+            var icon = ShellLinkHelper.GetIcon(shortcut, dpi, 40) ?? ShellLinkHelper.GetShellAppIcon(path, dpi, 40);
+            if (icon != null) return icon;
+        }
+
+        return null;
     }
 
     private void LaunchApp(DockItem item, bool admin = false)
     {
         try
         {
+            string path = ResolveTargetPath(item.TargetPath);
             var psi = new ProcessStartInfo
             {
-                FileName = item.TargetPath,
+                FileName = path,
                 Arguments = item.Arguments,
                 UseShellExecute = true,
                 Verb = admin ? "runas" : ""
@@ -467,13 +613,14 @@ public sealed class DockBarWindow : Window
     {
         try
         {
-            if (File.Exists(item.TargetPath))
+            string path = ResolveTargetPath(item.TargetPath);
+            if (File.Exists(path))
             {
-                Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{item.TargetPath}\"") { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true });
             }
-            else if (Directory.Exists(item.TargetPath))
+            else if (Directory.Exists(path))
             {
-                Process.Start(new ProcessStartInfo(item.TargetPath) { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
             }
         }
         catch (Exception ex)
@@ -557,7 +704,7 @@ public sealed class DockBarWindow : Window
         double logicalAreaBottom = area.Bottom / dpiY;
 
         double x = logicalAreaLeft + (logicalAreaWidth - ActualWidth) / 2;
-        double y = logicalAreaBottom - ActualHeight - 10;
+        double y = logicalAreaBottom - ActualHeight - 8;
 
         Left = Math.Round(x);
         _normalTop = Math.Round(y);
@@ -571,11 +718,18 @@ public sealed class DockBarWindow : Window
         var source = PresentationSource.FromVisual(this);
         double dpiY = source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
         double screenBottom = screen.WorkingArea.Bottom / dpiY;
-        double targetTop = down ? screenBottom - 5 : _normalTop;
+        // When slid down, leave a 3px edge strip visible at the bottom
+        double targetTop = down ? screenBottom - 3 : _normalTop;
 
         var anim = new DoubleAnimation(targetTop, TimeSpan.FromMilliseconds(220))
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+            FillBehavior = FillBehavior.Stop
+        };
+        anim.Completed += (_, _) =>
+        {
+            BeginAnimation(TopProperty, null);
+            Top = targetTop;
         };
         BeginAnimation(TopProperty, anim);
     }
@@ -594,10 +748,13 @@ public sealed class DockBarWindow : Window
     {
         if (element.RenderTransform is ScaleTransform scale)
         {
-            var down = new DoubleAnimation(0.92, TimeSpan.FromMilliseconds(70));
+            bool fired = false;
+            var down = new DoubleAnimation(0.92, TimeSpan.FromMilliseconds(65));
             down.Completed += (_, _) =>
             {
-                var up = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(120));
+                if (fired) return;
+                fired = true;
+                var up = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(110));
                 scale.BeginAnimation(ScaleTransform.ScaleXProperty, up);
                 scale.BeginAnimation(ScaleTransform.ScaleYProperty, up);
                 callback();
@@ -627,15 +784,19 @@ public sealed class DockBarWindow : Window
     private static DockConfig PopulateInitialDock(ConfigManager store)
     {
         var config = new DockConfig();
+        string winDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        string sysDir = Environment.SystemDirectory;
+        string edgePath = @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe";
+        if (!File.Exists(edgePath)) edgePath = @"C:\Program Files\Microsoft\Edge\Application\msedge.exe";
+
         var candidates = new List<(string Name, string Path)>
         {
-            ("文件资源管理器", "explorer.exe"),
-            ("Microsoft Edge", "msedge.exe"),
-            ("任务管理器", "taskmgr.exe"),
-            ("系统设置", "ms-settings:")
+            ("文件资源管理器", Path.Combine(winDir, "explorer.exe")),
+            ("Microsoft Edge", edgePath),
+            ("任务管理器", Path.Combine(sysDir, "taskmgr.exe")),
+            ("系统设置", "windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel")
         };
 
-        // Try to add popular apps if present in shortcuts.json
         try
         {
             var shortcuts = store.Load<ShortcutConfig>("shortcuts.json").Value;
