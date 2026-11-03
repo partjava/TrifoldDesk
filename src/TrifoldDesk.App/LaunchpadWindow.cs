@@ -143,13 +143,15 @@ public sealed class LaunchpadWindow : Window
         var gridHost = new Grid();
         gridHost.Children.Add(_statusText);
         gridHost.Children.Add(_grid);
-        gridHost.Children.Add(_dragCanvas);
         Grid.SetRow(gridHost, 1);
         mainGrid.Children.Add(gridHost);
 
         var paginationBar = BuildPaginationBar();
         Grid.SetRow(paginationBar, 2);
         mainGrid.Children.Add(paginationBar);
+
+        Grid.SetRowSpan(_dragCanvas, 3);
+        mainGrid.Children.Add(_dragCanvas);
 
         _glass.Child = mainGrid;
         Content = _glass;
@@ -508,6 +510,12 @@ public sealed class LaunchpadWindow : Window
         var scale = new ScaleTransform(1.0, 1.0);
         cell.RenderTransform = scale;
 
+        if (_isDragging && app == _draggedApp)
+        {
+            cell.Opacity = 0.25;
+            _draggedCell = cell;
+        }
+
         var stack = new StackPanel
         {
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -612,6 +620,7 @@ public sealed class LaunchpadWindow : Window
     private void OnWindowMouseMove(object sender, MouseEventArgs e)
     {
         if (e.LeftButton != MouseButtonState.Pressed || _draggedApp == null || _draggedCell == null) return;
+        if (!string.IsNullOrEmpty(_searchBox.Text.Trim())) return;
 
         var curPos = e.GetPosition(this);
         if (!_isDragging && (curPos - _dragStartPoint).Length > 6)

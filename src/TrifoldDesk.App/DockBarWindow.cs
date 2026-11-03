@@ -494,27 +494,27 @@ public sealed class DockBarWindow : Window
                     container.Opacity = 1.0;
                     container.ToolTip = item.Name;
 
-                    // Real-time slot reorder within items panel
+                    // Real-time slot reorder within items panel without destroying elements or losing capture
+                    int curIdx = _itemsPanel.Children.IndexOf(container);
+                    int targetIdx = -1;
                     var panelPos = e.GetPosition(_itemsPanel);
                     for (int i = 0; i < _itemsPanel.Children.Count; i++)
                     {
-                        if (_itemsPanel.Children[i] is FrameworkElement child && child.Tag is DockItem targetItem && targetItem != item)
+                        if (_itemsPanel.Children[i] is FrameworkElement child && child != container)
                         {
                             var childBounds = child.TranslatePoint(new Point(0, 0), _itemsPanel);
                             if (panelPos.X >= childBounds.X && panelPos.X <= childBounds.X + child.ActualWidth)
                             {
-                                int curIdx = _config.Items.IndexOf(item);
-                                int targetIdx = _config.Items.IndexOf(targetItem);
-                                if (curIdx >= 0 && targetIdx >= 0 && curIdx != targetIdx)
-                                {
-                                    _config.Items.RemoveAt(curIdx);
-                                    _config.Items.Insert(targetIdx, item);
-                                    for (int o = 0; o < _config.Items.Count; o++) _config.Items[o].Order = o;
-                                    Render();
-                                    break;
-                                }
+                                targetIdx = i;
+                                break;
                             }
                         }
+                    }
+
+                    if (curIdx >= 0 && targetIdx >= 0 && curIdx != targetIdx)
+                    {
+                        _itemsPanel.Children.RemoveAt(curIdx);
+                        _itemsPanel.Children.Insert(targetIdx, container);
                     }
                 }
             }
@@ -536,6 +536,17 @@ public sealed class DockBarWindow : Window
                 }
                 else
                 {
+                    // Commit new order from _itemsPanel.Children
+                    var reordered = new List<DockItem>();
+                    for (int i = 0; i < _itemsPanel.Children.Count; i++)
+                    {
+                        if (_itemsPanel.Children[i] is FrameworkElement el && el.Tag is DockItem di)
+                        {
+                            di.Order = i;
+                            reordered.Add(di);
+                        }
+                    }
+                    _config.Items = reordered;
                     SaveConfig();
                     Render();
                 }
