@@ -55,11 +55,11 @@ public sealed class LaunchpadWindow : Window
         Background = Brushes.Transparent;
         ShowInTaskbar = false;
         Topmost = true;
-        Width = 880;
-        Height = 580;
+        Width = 920;
+        Height = 620;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        WindowAcrylic.ApplyAcrylic(this, 48, 18, 22, 30);
+        WindowAcrylic.ApplyAcrylic(this, 185, 16, 22, 32);
 
         BuildUI();
 
@@ -90,22 +90,22 @@ public sealed class LaunchpadWindow : Window
     private void BuildUI()
     {
         _glass.CornerRadius = new CornerRadius(26);
-        // Liquid Frosted Glass material overlay
+        // Deep Liquid Frosted Glass (GlassDesk standard)
         _glass.Background = new LinearGradientBrush(
-            Color.FromArgb(20, 255, 255, 255),
-            Color.FromArgb(10, 255, 255, 255),
+            Color.FromArgb(198, 16, 22, 32),
+            Color.FromArgb(168, 12, 16, 24),
             90);
         _glass.BorderBrush = new LinearGradientBrush(
-            Color.FromArgb(140, 255, 255, 255),
-            Color.FromArgb(35, 255, 255, 255),
+            Color.FromArgb(165, 255, 255, 255),
+            Color.FromArgb(42, 255, 255, 255),
             45);
         _glass.BorderThickness = new Thickness(1.2);
         _glass.Effect = new DropShadowEffect
         {
-            BlurRadius = 38,
-            ShadowDepth = 8,
+            BlurRadius = 42,
+            ShadowDepth = 10,
             Direction = 270,
-            Opacity = 0.35,
+            Opacity = 0.40,
             Color = Colors.Black
         };
         _glass.ClipToBounds = true;
@@ -261,6 +261,17 @@ public sealed class LaunchpadWindow : Window
 
     private FrameworkElement BuildPaginationBar()
     {
+        var pill = new Border
+        {
+            CornerRadius = new CornerRadius(16),
+            Background = new SolidColorBrush(Color.FromArgb(42, 255, 255, 255)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(8, 2, 8, 2),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
         var panel = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -280,7 +291,8 @@ public sealed class LaunchpadWindow : Window
         _nextBtn.Click += (_, _) => NextPage();
         panel.Children.Add(_nextBtn);
 
-        return panel;
+        pill.Child = panel;
+        return pill;
     }
 
     private static void StyleNavBtn(Button btn, string arrow)
@@ -501,7 +513,6 @@ public sealed class LaunchpadWindow : Window
             CornerRadius = new CornerRadius(14),
             Background = Brushes.Transparent,
             Cursor = Cursors.Hand,
-            ToolTip = app.Details,
             Margin = new Thickness(2, 4, 2, 4),
             Padding = new Thickness(4, 4, 4, 4),
             RenderTransformOrigin = new Point(0.5, 0.5),

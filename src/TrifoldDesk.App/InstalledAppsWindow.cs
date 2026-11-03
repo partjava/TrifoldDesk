@@ -52,7 +52,7 @@ public sealed class InstalledAppsWindow : Window
         Topmost = false;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        WindowAcrylic.ApplyAcrylic(this, 50, 18, 22, 30);
+        WindowAcrylic.ApplyAcrylic(this, 185, 16, 22, 32);
 
         _catalog = InstalledAppsService.Read();
 
@@ -72,25 +72,25 @@ public sealed class InstalledAppsWindow : Window
 
     private void BuildUI()
     {
-        // Crystal-clear liquid frosted acrylic glass frame with hardware blur
+        // Deep Liquid Frosted Glass (GlassDesk standard)
         var glass = new Border
         {
             CornerRadius = new CornerRadius(22),
             Background = new LinearGradientBrush(
-                Color.FromArgb(22, 255, 255, 255),
-                Color.FromArgb(12, 255, 255, 255),
+                Color.FromArgb(198, 16, 22, 32),
+                Color.FromArgb(168, 12, 16, 24),
                 90),
             BorderBrush = new LinearGradientBrush(
-                Color.FromArgb(135, 255, 255, 255),
-                Color.FromArgb(32, 255, 255, 255),
+                Color.FromArgb(165, 255, 255, 255),
+                Color.FromArgb(42, 255, 255, 255),
                 45),
             BorderThickness = new Thickness(1.2),
             Effect = new DropShadowEffect
             {
-                BlurRadius = 32,
-                ShadowDepth = 6,
+                BlurRadius = 36,
+                ShadowDepth = 8,
                 Direction = 270,
-                Opacity = 0.30,
+                Opacity = 0.38,
                 Color = Colors.Black
             },
             ClipToBounds = true
@@ -440,8 +440,7 @@ public sealed class InstalledAppsWindow : Window
             CornerRadius = new CornerRadius(10),
             Margin = new Thickness(3, 3, 3, 3),
             Padding = new Thickness(3, 4, 3, 4),
-            Cursor = Cursors.Hand,
-            ToolTip = app.Details
+            Cursor = Cursors.Hand
         };
 
         UpdateCardAppearance(card, isSelected);

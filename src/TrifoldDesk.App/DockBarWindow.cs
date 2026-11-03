@@ -65,7 +65,7 @@ public sealed class DockBarWindow : Window
 
         Topmost = _config.AlwaysOnTop;
 
-        WindowAcrylic.ApplyAcrylic(this, 42, 18, 22, 30);
+        WindowAcrylic.ApplyAcrylic(this, 185, 16, 22, 32);
 
         BuildUI();
 
@@ -155,22 +155,22 @@ public sealed class DockBarWindow : Window
     {
         _pill.CornerRadius = new CornerRadius(24);
         _pill.Padding = new Thickness(10, 5, 10, 5);
-        // Crystal-clear liquid frosted glass with hardware acrylic blur
+        // Deep Liquid Frosted Glass (GlassDesk standard)
         _pill.Background = new LinearGradientBrush(
-            Color.FromArgb(24, 255, 255, 255),
-            Color.FromArgb(10, 255, 255, 255),
+            Color.FromArgb(198, 16, 22, 32),
+            Color.FromArgb(168, 12, 16, 24),
             90);
         _pill.BorderBrush = new LinearGradientBrush(
-            Color.FromArgb(135, 255, 255, 255),
-            Color.FromArgb(35, 255, 255, 255),
+            Color.FromArgb(165, 255, 255, 255),
+            Color.FromArgb(42, 255, 255, 255),
             45);
         _pill.BorderThickness = new Thickness(1.2);
         _pill.Effect = new DropShadowEffect
         {
-            BlurRadius = 24,
-            ShadowDepth = 4,
+            BlurRadius = 28,
+            ShadowDepth = 6,
             Direction = 270,
-            Opacity = 0.22,
+            Opacity = 0.35,
             Color = Colors.Black
         };
 
