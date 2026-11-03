@@ -125,6 +125,7 @@ try
     ProfilePackageTests.Run(Check);
     LegacyMigrationTests.Run(Check);
     DockTests.Run(Check);
+    LauncherLayoutTests.Run(Check);
     Console.WriteLine($"{passed} checks passed.");
 }
 finally { Directory.Delete(root, true); }

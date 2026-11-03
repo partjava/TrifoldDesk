@@ -52,6 +52,8 @@ public sealed class InstalledAppsWindow : Window
         Topmost = false;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
+        WindowAcrylic.ApplyAcrylic(this, 50, 18, 22, 30);
+
         _catalog = InstalledAppsService.Read();
 
         BuildUI();
@@ -70,17 +72,17 @@ public sealed class InstalledAppsWindow : Window
 
     private void BuildUI()
     {
-        // Translucent frosted acrylic glass frame (airy, modern, no heavy dark block)
+        // Crystal-clear liquid frosted acrylic glass frame with hardware blur
         var glass = new Border
         {
             CornerRadius = new CornerRadius(22),
             Background = new LinearGradientBrush(
-                Color.FromArgb(85, 20, 28, 40),
-                Color.FromArgb(115, 12, 16, 24),
+                Color.FromArgb(22, 255, 255, 255),
+                Color.FromArgb(12, 255, 255, 255),
                 90),
             BorderBrush = new LinearGradientBrush(
-                Color.FromArgb(120, 255, 255, 255),
-                Color.FromArgb(30, 255, 255, 255),
+                Color.FromArgb(135, 255, 255, 255),
+                Color.FromArgb(32, 255, 255, 255),
                 45),
             BorderThickness = new Thickness(1.2),
             Effect = new DropShadowEffect
@@ -88,7 +90,7 @@ public sealed class InstalledAppsWindow : Window
                 BlurRadius = 32,
                 ShadowDepth = 6,
                 Direction = 270,
-                Opacity = 0.35,
+                Opacity = 0.30,
                 Color = Colors.Black
             },
             ClipToBounds = true

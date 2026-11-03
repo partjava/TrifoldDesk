@@ -67,8 +67,24 @@ public sealed class WidgetFrame : Border
         }
         else
         {
-            Background = (model.PluginId is "apps" or "projects" or "folder") ? Brushes.Transparent : new SolidColorBrush(Color.FromArgb(28, 15, 23, 42));
-            BorderBrush = (model.PluginId == "folder") ? Brushes.Transparent : new SolidColorBrush(Color.FromArgb(45, 255, 255, 255));
+            if (model.PluginId is "apps" or "projects" or "folder")
+            {
+                Background = Brushes.Transparent;
+                BorderBrush = Brushes.Transparent;
+            }
+            else
+            {
+                // Liquid Frosted Glass styling for general widgets (except folders)
+                Background = new LinearGradientBrush(
+                    Color.FromArgb(28, 255, 255, 255),
+                    Color.FromArgb(12, 255, 255, 255),
+                    90);
+                BorderBrush = new LinearGradientBrush(
+                    Color.FromArgb(115, 255, 255, 255),
+                    Color.FromArgb(28, 255, 255, 255),
+                    45);
+                BorderThickness = new Thickness(1.2);
+            }
         }
         ClipToBounds = true;
         if (model.PluginId == "folder") CornerRadius = new CornerRadius(10);

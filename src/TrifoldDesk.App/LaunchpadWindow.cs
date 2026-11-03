@@ -13,9 +13,9 @@ namespace TrifoldDesk;
 
 public sealed class LaunchpadWindow : Window
 {
-    private const int Columns = 8;
-    private const int Rows = 4;
-    private const int PageSize = Columns * Rows; // 32 apps per page
+    private const int Columns = 7;
+    private const int Rows = 5;
+    private const int PageSize = Columns * Rows; // 35 apps per page (exact match to GlassDesk)
 
     private readonly Action<DockItem> _onPinToDock;
     private readonly List<InstalledApp> _allApps = [];
@@ -26,13 +26,23 @@ public sealed class LaunchpadWindow : Window
     private DateTime _lastToggleAt = DateTime.MinValue;
 
     private readonly Border _glass = new();
-    private readonly UniformGrid _grid = new() { Columns = Columns, Rows = Rows, Margin = new Thickness(14, 4, 14, 6) };
+    private readonly UniformGrid _grid = new() { Columns = Columns, Rows = Rows, Margin = new Thickness(18, 6, 18, 6) };
+    private readonly Canvas _dragCanvas = new() { IsHitTestVisible = false };
     private readonly TextBox _searchBox = new();
     private readonly TextBlock _searchHint = new() { Text = "搜索应用…", Foreground = new SolidColorBrush(Color.FromArgb(140, 255, 255, 255)), FontSize = 12.5, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
     private readonly TextBlock _pageLabel = new() { FontSize = 12, Foreground = new SolidColorBrush(Color.FromArgb(190, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 14, 0) };
     private readonly Button _prevBtn = new();
     private readonly Button _nextBtn = new();
     private readonly TextBlock _statusText = new() { Text = "正在读取已安装应用…", FontSize = 13, Foreground = new SolidColorBrush(Color.FromArgb(170, 255, 255, 255)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+
+    // Drag-and-drop state
+    private bool _isDragging;
+    private Point _dragStartPoint;
+    private InstalledApp? _draggedApp;
+    private FrameworkElement? _draggedCell;
+    private Border? _ghostCell;
+    private int _dragTargetIndex = -1;
+    private DateTime _lastEdgePageTime = DateTime.MinValue;
 
     public LaunchpadWindow(Action<DockItem> onPinToDock)
     {
@@ -45,11 +55,16 @@ public sealed class LaunchpadWindow : Window
         Background = Brushes.Transparent;
         ShowInTaskbar = false;
         Topmost = true;
-        Width = 840;
-        Height = 520;
+        Width = 880;
+        Height = 580;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
+        WindowAcrylic.ApplyAcrylic(this, 48, 18, 22, 30);
+
         BuildUI();
+
+        MouseMove += OnWindowMouseMove;
+        MouseLeftButtonUp += OnWindowMouseUp;
 
         KeyDown += (_, e) =>
         {
@@ -74,30 +89,31 @@ public sealed class LaunchpadWindow : Window
 
     private void BuildUI()
     {
-        _glass.CornerRadius = new CornerRadius(28);
+        _glass.CornerRadius = new CornerRadius(26);
+        // Liquid Frosted Glass material overlay
         _glass.Background = new LinearGradientBrush(
-            Color.FromArgb(75, 24, 32, 46),
-            Color.FromArgb(105, 12, 16, 24),
+            Color.FromArgb(20, 255, 255, 255),
+            Color.FromArgb(10, 255, 255, 255),
             90);
         _glass.BorderBrush = new LinearGradientBrush(
-            Color.FromArgb(150, 255, 255, 255),
+            Color.FromArgb(140, 255, 255, 255),
             Color.FromArgb(35, 255, 255, 255),
             45);
-        _glass.BorderThickness = new Thickness(1.4);
+        _glass.BorderThickness = new Thickness(1.2);
         _glass.Effect = new DropShadowEffect
         {
-            BlurRadius = 45,
-            ShadowDepth = 10,
+            BlurRadius = 38,
+            ShadowDepth = 8,
             Direction = 270,
-            Opacity = 0.5,
+            Opacity = 0.35,
             Color = Colors.Black
         };
         _glass.ClipToBounds = true;
 
         var mainGrid = new Grid();
-        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(60) });
+        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(56) });
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(44) });
+        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(42) });
 
         var topShine = new Border
         {
@@ -127,6 +143,7 @@ public sealed class LaunchpadWindow : Window
         var gridHost = new Grid();
         gridHost.Children.Add(_statusText);
         gridHost.Children.Add(_grid);
+        gridHost.Children.Add(_dragCanvas);
         Grid.SetRow(gridHost, 1);
         mainGrid.Children.Add(gridHost);
 
@@ -140,22 +157,27 @@ public sealed class LaunchpadWindow : Window
 
     private FrameworkElement BuildSearchBar()
     {
-        var searchContainer = new Border
+        var headerDock = new StackPanel
         {
-            Width = 340,
-            Height = 35,
-            CornerRadius = new CornerRadius(17.5),
-            Background = new SolidColorBrush(Color.FromArgb(38, 255, 255, 255)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(65, 255, 255, 255)),
-            BorderThickness = new Thickness(1),
-            Margin = new Thickness(0, 14, 0, 4),
-            HorizontalAlignment = HorizontalAlignment.Center
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 12, 0, 4)
         };
 
-        var searchGrid = new Grid { Margin = new Thickness(14, 0, 10, 0) };
+        var searchContainer = new Border
+        {
+            Width = 360,
+            Height = 36,
+            CornerRadius = new CornerRadius(18),
+            Background = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)),
+            BorderThickness = new Thickness(1),
+            Margin = new Thickness(0, 0, 10, 0)
+        };
+
+        var searchGrid = new Grid { Margin = new Thickness(14, 0, 12, 0) };
         searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         var icon = new TextBlock
         {
@@ -187,46 +209,76 @@ public sealed class LaunchpadWindow : Window
         inputHost.Children.Add(_searchHint);
         Grid.SetColumn(inputHost, 1);
         searchGrid.Children.Add(inputHost);
-
-        var searchBtn = new Border
-        {
-            CornerRadius = new CornerRadius(11),
-            Background = new SolidColorBrush(Color.FromArgb(35, 255, 255, 255)),
-            Padding = new Thickness(10, 3, 10, 3),
-            VerticalAlignment = VerticalAlignment.Center,
-            Cursor = Cursors.Hand
-        };
-        var btnText = new TextBlock { Text = "搜索", FontSize = 11.5, Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)) };
-        searchBtn.Child = btnText;
-        searchBtn.MouseLeftButtonUp += (_, _) => ApplyFilter();
-        Grid.SetColumn(searchBtn, 2);
-        searchGrid.Children.Add(searchBtn);
-
         searchContainer.Child = searchGrid;
-        return searchContainer;
+
+        // "＋ 添加应用" button (GlassDesk style)
+        var addBtn = new Border
+        {
+            Height = 36,
+            CornerRadius = new CornerRadius(18),
+            Background = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(16, 0, 16, 0),
+            Cursor = Cursors.Hand,
+            ToolTip = "从已安装应用添加快捷方式"
+        };
+        var addText = new TextBlock
+        {
+            Text = "＋ 添加应用",
+            FontSize = 12.5,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromArgb(225, 255, 255, 255)),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        addBtn.Child = addText;
+        addBtn.MouseEnter += (_, _) => addBtn.Background = new SolidColorBrush(Color.FromArgb(50, 255, 255, 255));
+        addBtn.MouseLeave += (_, _) => addBtn.Background = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255));
+        addBtn.MouseLeftButtonUp += (_, _) =>
+        {
+            Dismiss();
+            var picker = new InstalledAppsWindow();
+            if (picker.ShowDialog() == true)
+            {
+                foreach (var sel in picker.Selected)
+                {
+                    _onPinToDock(new DockItem
+                    {
+                        Name = sel.DisplayName,
+                        TargetPath = string.IsNullOrEmpty(sel.TargetPath) ? sel.ShellPath : sel.TargetPath,
+                        Arguments = sel.Arguments
+                    });
+                }
+            }
+        };
+
+        headerDock.Children.Add(searchContainer);
+        headerDock.Children.Add(addBtn);
+        return headerDock;
     }
 
     private FrameworkElement BuildPaginationBar()
     {
-        var bar = new StackPanel
+        var panel = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 0, 8)
+            VerticalAlignment = VerticalAlignment.Center
         };
 
         StyleNavBtn(_prevBtn, "‹");
+        _prevBtn.ToolTip = "上一页 (←)";
         _prevBtn.Click += (_, _) => PrevPage();
+        panel.Children.Add(_prevBtn);
+
+        panel.Children.Add(_pageLabel);
 
         StyleNavBtn(_nextBtn, "›");
+        _nextBtn.ToolTip = "下一页 (→)";
         _nextBtn.Click += (_, _) => NextPage();
+        panel.Children.Add(_nextBtn);
 
-        bar.Children.Add(_prevBtn);
-        bar.Children.Add(_pageLabel);
-        bar.Children.Add(_nextBtn);
-
-        return bar;
+        return panel;
     }
 
     private static void StyleNavBtn(Button btn, string arrow)
@@ -329,6 +381,25 @@ public sealed class LaunchpadWindow : Window
             var apps = await Task.Run(InstalledAppsService.Read);
             _allApps.Clear();
             _allApps.AddRange(apps);
+
+            // Reconcile with saved custom ordering
+            var layout = LauncherLayoutConfig.Load();
+            if (layout.OrderedShellPaths.Count > 0)
+            {
+                var orderMap = layout.OrderedShellPaths
+                    .Select((p, idx) => (p, idx))
+                    .ToDictionary(x => x.p, x => x.idx, StringComparer.OrdinalIgnoreCase);
+
+                _allApps.Sort((a, b) =>
+                {
+                    bool hasA = orderMap.TryGetValue(a.ShellPath, out int idxA);
+                    bool hasB = orderMap.TryGetValue(b.ShellPath, out int idxB);
+                    if (hasA && hasB) return idxA.CompareTo(idxB);
+                    if (hasA) return -1;
+                    if (hasB) return 1;
+                    return string.Compare(a.DisplayName, b.DisplayName, StringComparison.CurrentCultureIgnoreCase);
+                });
+            }
         }
         catch (Exception ex)
         {
@@ -339,6 +410,22 @@ public sealed class LaunchpadWindow : Window
         {
             _loading = false;
             ApplyFilter();
+        }
+    }
+
+    private void SaveLayoutOrder()
+    {
+        try
+        {
+            var config = new LauncherLayoutConfig
+            {
+                OrderedShellPaths = _allApps.Select(a => a.ShellPath).ToList()
+            };
+            config.Save();
+        }
+        catch
+        {
+            // Ignore write error
         }
     }
 
@@ -413,9 +500,10 @@ public sealed class LaunchpadWindow : Window
             Background = Brushes.Transparent,
             Cursor = Cursors.Hand,
             ToolTip = app.Details,
-            Margin = new Thickness(4),
-            Padding = new Thickness(4, 6, 4, 6),
-            RenderTransformOrigin = new Point(0.5, 0.5)
+            Margin = new Thickness(2, 4, 2, 4),
+            Padding = new Thickness(4, 4, 4, 4),
+            RenderTransformOrigin = new Point(0.5, 0.5),
+            Tag = app
         };
         var scale = new ScaleTransform(1.0, 1.0);
         cell.RenderTransform = scale;
@@ -445,7 +533,7 @@ public sealed class LaunchpadWindow : Window
             TextTrimming = TextTrimming.CharacterEllipsis,
             TextAlignment = TextAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Center,
-            MaxWidth = 84,
+            MaxWidth = 96,
             MaxHeight = 28,
             Effect = TextContrast.Shadow
         };
@@ -455,22 +543,38 @@ public sealed class LaunchpadWindow : Window
 
         cell.MouseEnter += (_, _) =>
         {
-            cell.Background = new SolidColorBrush(Color.FromArgb(38, 255, 255, 255));
-            AnimateScale(scale, 1.12);
+            if (!_isDragging)
+            {
+                cell.Background = new SolidColorBrush(Color.FromArgb(38, 255, 255, 255));
+                AnimateScale(scale, 1.12);
+            }
         };
         cell.MouseLeave += (_, _) =>
         {
             cell.Background = Brushes.Transparent;
             AnimateScale(scale, 1.0);
         };
+
+        cell.MouseLeftButtonDown += (_, e) =>
+        {
+            _dragStartPoint = e.GetPosition(this);
+            _draggedApp = app;
+            _draggedCell = cell;
+            _isDragging = false;
+            _dragTargetIndex = -1;
+        };
+
         cell.MouseLeftButtonUp += (_, e) =>
         {
-            e.Handled = true;
-            AnimateClick(cell, () =>
+            if (!_isDragging)
             {
-                LaunchApp(app);
-                Dismiss();
-            });
+                e.Handled = true;
+                AnimateClick(cell, () =>
+                {
+                    LaunchApp(app);
+                    Dismiss();
+                });
+            }
         };
 
         var menu = new ContextMenu();
@@ -503,6 +607,160 @@ public sealed class LaunchpadWindow : Window
         cell.ContextMenu = menu;
 
         return cell;
+    }
+
+    private void OnWindowMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || _draggedApp == null || _draggedCell == null) return;
+
+        var curPos = e.GetPosition(this);
+        if (!_isDragging && (curPos - _dragStartPoint).Length > 6)
+        {
+            _isDragging = true;
+            CaptureMouse();
+
+            // Create Ghost floating icon
+            _ghostCell = new Border
+            {
+                Width = _draggedCell.ActualWidth,
+                Height = _draggedCell.ActualHeight,
+                Background = new SolidColorBrush(Color.FromArgb(70, 255, 255, 255)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(180, 255, 255, 255)),
+                BorderThickness = new Thickness(1.2),
+                CornerRadius = new CornerRadius(14),
+                IsHitTestVisible = false,
+                Effect = new DropShadowEffect
+                {
+                    BlurRadius = 18,
+                    ShadowDepth = 6,
+                    Direction = 270,
+                    Opacity = 0.45,
+                    Color = Colors.Black
+                },
+                RenderTransform = new ScaleTransform(1.08, 1.08),
+                RenderTransformOrigin = new Point(0.5, 0.5)
+            };
+
+            var ghostStack = new StackPanel
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var ghostIcon = new Image
+            {
+                Source = ShellLinkHelper.GetShellAppIcon(_draggedApp.ShellPath, VisualTreeHelper.GetDpi(this).DpiScaleX, 44),
+                Width = 42,
+                Height = 42,
+                Margin = new Thickness(0, 0, 0, 4),
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            var ghostName = new TextBlock
+            {
+                Text = _draggedApp.DisplayName,
+                FontSize = 11.5,
+                Foreground = Brushes.White,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                TextAlignment = TextAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                MaxWidth = 96,
+                MaxHeight = 28,
+                Effect = TextContrast.Shadow
+            };
+            ghostStack.Children.Add(ghostIcon);
+            ghostStack.Children.Add(ghostName);
+            _ghostCell.Child = ghostStack;
+
+            _dragCanvas.Children.Add(_ghostCell);
+            _draggedCell.Opacity = 0.25;
+        }
+
+        if (_isDragging && _ghostCell != null)
+        {
+            var canvasPos = e.GetPosition(_dragCanvas);
+            Canvas.SetLeft(_ghostCell, canvasPos.X - _ghostCell.ActualWidth / 2);
+            Canvas.SetTop(_ghostCell, canvasPos.Y - _ghostCell.ActualHeight / 2);
+
+            // Edge-hover page switching
+            if ((DateTime.UtcNow - _lastEdgePageTime).TotalMilliseconds > 450)
+            {
+                if (canvasPos.X < 36)
+                {
+                    _lastEdgePageTime = DateTime.UtcNow;
+                    PrevPage();
+                    return;
+                }
+                else if (canvasPos.X > ActualWidth - 36)
+                {
+                    _lastEdgePageTime = DateTime.UtcNow;
+                    NextPage();
+                    return;
+                }
+            }
+
+            // Real-time slot displacement
+            var gridPos = e.GetPosition(_grid);
+            if (gridPos.X >= 0 && gridPos.X < _grid.ActualWidth && gridPos.Y >= 0 && gridPos.Y < _grid.ActualHeight)
+            {
+                double cellW = _grid.ActualWidth / Columns;
+                double cellH = _grid.ActualHeight / Rows;
+                int col = Math.Clamp((int)(gridPos.X / cellW), 0, Columns - 1);
+                int row = Math.Clamp((int)(gridPos.Y / cellH), 0, Rows - 1);
+                int slotIdx = _currentPage * PageSize + row * Columns + col;
+                slotIdx = Math.Clamp(slotIdx, 0, _filteredApps.Count - 1);
+
+                if (slotIdx != _dragTargetIndex)
+                {
+                    _dragTargetIndex = slotIdx;
+                    int curIdx = _filteredApps.IndexOf(_draggedApp);
+                    if (curIdx >= 0 && curIdx != _dragTargetIndex)
+                    {
+                        _filteredApps.RemoveAt(curIdx);
+                        _filteredApps.Insert(_dragTargetIndex, _draggedApp);
+
+                        // Also reflect in _allApps
+                        int allCurIdx = _allApps.IndexOf(_draggedApp);
+                        if (allCurIdx >= 0)
+                        {
+                            _allApps.RemoveAt(allCurIdx);
+                            int allTargetIdx = Math.Clamp(_dragTargetIndex, 0, _allApps.Count);
+                            _allApps.Insert(allTargetIdx, _draggedApp);
+                        }
+                        RenderPage();
+                    }
+                }
+            }
+        }
+    }
+
+    private void OnWindowMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_isDragging)
+        {
+            ReleaseMouseCapture();
+            _isDragging = false;
+            _dragCanvas.Children.Clear();
+            _ghostCell = null;
+
+            var curPos = e.GetPosition(this);
+            // Dragged out of bottom edge to pin directly to Dock
+            if (curPos.Y > ActualHeight - 10 && _draggedApp != null)
+            {
+                _onPinToDock(new DockItem
+                {
+                    Name = _draggedApp.DisplayName,
+                    TargetPath = string.IsNullOrEmpty(_draggedApp.TargetPath) ? _draggedApp.ShellPath : _draggedApp.TargetPath,
+                    Arguments = _draggedApp.Arguments
+                });
+            }
+
+            if (_draggedCell != null) _draggedCell.Opacity = 1.0;
+            _draggedCell = null;
+            _draggedApp = null;
+            _dragTargetIndex = -1;
+
+            SaveLayoutOrder();
+            RenderPage();
+        }
     }
 
     private void PrevPage()

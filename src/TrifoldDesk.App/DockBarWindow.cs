@@ -18,12 +18,18 @@ public sealed class DockBarWindow : Window
 {
     private readonly ConfigManager _store;
     private DockConfig _config;
+    private readonly StackPanel _mainStack = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly StackPanel _itemsPanel = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly Border _pill = new();
     private readonly DispatcherTimer _hideTimer = new() { Interval = TimeSpan.FromMilliseconds(450) };
     private readonly DispatcherTimer _edgeTriggerTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private bool _isSlidDown;
     private double _normalTop;
+
+    // Drag-drop reordering & wave magnification state
+    private bool _isDockDragging;
+    private Point _dockDragStart;
+    private DockItem? _dockDraggedItem;
 
     public event Action? LaunchpadRequested;
 
@@ -58,6 +64,8 @@ public sealed class DockBarWindow : Window
         }
 
         Topmost = _config.AlwaysOnTop;
+
+        WindowAcrylic.ApplyAcrylic(this, 42, 18, 22, 30);
 
         BuildUI();
 
@@ -147,22 +155,22 @@ public sealed class DockBarWindow : Window
     {
         _pill.CornerRadius = new CornerRadius(24);
         _pill.Padding = new Thickness(10, 5, 10, 5);
-        // Crystal-clear frosted glass background (transparent aesthetic requested)
+        // Crystal-clear liquid frosted glass with hardware acrylic blur
         _pill.Background = new LinearGradientBrush(
-            Color.FromArgb(28, 255, 255, 255),
-            Color.FromArgb(12, 255, 255, 255),
+            Color.FromArgb(24, 255, 255, 255),
+            Color.FromArgb(10, 255, 255, 255),
             90);
         _pill.BorderBrush = new LinearGradientBrush(
-            Color.FromArgb(120, 255, 255, 255),
+            Color.FromArgb(135, 255, 255, 255),
             Color.FromArgb(35, 255, 255, 255),
             45);
         _pill.BorderThickness = new Thickness(1.2);
         _pill.Effect = new DropShadowEffect
         {
-            BlurRadius = 22,
+            BlurRadius = 24,
             ShadowDepth = 4,
             Direction = 270,
-            Opacity = 0.20,
+            Opacity = 0.22,
             Color = Colors.Black
         };
 
@@ -232,18 +240,14 @@ public sealed class DockBarWindow : Window
 
         _pill.ContextMenu = contextMenu;
 
-        Render();
-    }
+        // Wave magnification on hover
+        _itemsPanel.MouseMove += OnItemsPanelMouseMove;
+        _itemsPanel.MouseLeave += OnItemsPanelMouseLeave;
 
-    public void Render()
-    {
-        var mainStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        // Static container structure - never reconnect _itemsPanel
+        _mainStack.Children.Clear();
+        _mainStack.Children.Add(CreateLaunchpadButton());
 
-        // 1. Launchpad button (9-dots button)
-        var launchpadBtn = CreateLaunchpadButton();
-        mainStack.Children.Add(launchpadBtn);
-
-        // 2. Vertical separator
         var separator = new Border
         {
             Width = 1,
@@ -252,9 +256,17 @@ public sealed class DockBarWindow : Window
             Margin = new Thickness(6, 0, 8, 0),
             VerticalAlignment = VerticalAlignment.Center
         };
-        mainStack.Children.Add(separator);
+        _mainStack.Children.Add(separator);
+        _mainStack.Children.Add(_itemsPanel);
+        _mainStack.Children.Add(CreateAddButton());
 
-        // 3. Pinned items
+        _pill.Child = _mainStack;
+
+        Render();
+    }
+
+    public void Render()
+    {
         _itemsPanel.Children.Clear();
         double dpi = VisualTreeHelper.GetDpi(this).DpiScaleX;
         var ordered = _config.Items.OrderBy(i => i.Order).ToList();
@@ -264,13 +276,6 @@ public sealed class DockBarWindow : Window
             var btn = CreateItemElement(item, dpi, i == 0, i == ordered.Count - 1);
             _itemsPanel.Children.Add(btn);
         }
-        mainStack.Children.Add(_itemsPanel);
-
-        // 4. Add shortcut button
-        var addBtn = CreateAddButton();
-        mainStack.Children.Add(addBtn);
-
-        _pill.Child = mainStack;
     }
 
     private FrameworkElement CreateLaunchpadButton()
@@ -399,7 +404,8 @@ public sealed class DockBarWindow : Window
             Margin = new Thickness(3, 0, 3, 0),
             Cursor = Cursors.Hand,
             ToolTip = item.Name,
-            RenderTransformOrigin = new Point(0.5, 0.5)
+            RenderTransformOrigin = new Point(0.5, 0.5),
+            Tag = item
         };
         var scale = new ScaleTransform(1.0, 1.0);
         container.RenderTransform = scale;
@@ -448,18 +454,96 @@ public sealed class DockBarWindow : Window
 
         container.MouseEnter += (_, _) =>
         {
-            container.Background = new SolidColorBrush(Color.FromArgb(42, 255, 255, 255));
-            AnimateScale(scale, 1.18);
+            if (!_isDockDragging)
+            {
+                container.Background = new SolidColorBrush(Color.FromArgb(42, 255, 255, 255));
+            }
         };
         container.MouseLeave += (_, _) =>
         {
             container.Background = Brushes.Transparent;
-            AnimateScale(scale, 1.0);
         };
+
+        container.MouseLeftButtonDown += (_, e) =>
+        {
+            _dockDragStart = e.GetPosition(this);
+            _dockDraggedItem = item;
+            _isDockDragging = false;
+        };
+
+        container.MouseMove += (_, e) =>
+        {
+            if (e.LeftButton != MouseButtonState.Pressed || _dockDraggedItem != item) return;
+            var curPos = e.GetPosition(this);
+            if (!_isDockDragging && (curPos - _dockDragStart).Length > 6)
+            {
+                _isDockDragging = true;
+                container.CaptureMouse();
+            }
+
+            if (_isDockDragging)
+            {
+                // Dragged upward out of dock: indicate removal
+                if (curPos.Y < -15)
+                {
+                    container.Opacity = 0.35;
+                    container.ToolTip = "松开即可从 Dock 栏中移除";
+                }
+                else
+                {
+                    container.Opacity = 1.0;
+                    container.ToolTip = item.Name;
+
+                    // Real-time slot reorder within items panel
+                    var panelPos = e.GetPosition(_itemsPanel);
+                    for (int i = 0; i < _itemsPanel.Children.Count; i++)
+                    {
+                        if (_itemsPanel.Children[i] is FrameworkElement child && child.Tag is DockItem targetItem && targetItem != item)
+                        {
+                            var childBounds = child.TranslatePoint(new Point(0, 0), _itemsPanel);
+                            if (panelPos.X >= childBounds.X && panelPos.X <= childBounds.X + child.ActualWidth)
+                            {
+                                int curIdx = _config.Items.IndexOf(item);
+                                int targetIdx = _config.Items.IndexOf(targetItem);
+                                if (curIdx >= 0 && targetIdx >= 0 && curIdx != targetIdx)
+                                {
+                                    _config.Items.RemoveAt(curIdx);
+                                    _config.Items.Insert(targetIdx, item);
+                                    for (int o = 0; o < _config.Items.Count; o++) _config.Items[o].Order = o;
+                                    Render();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
         container.MouseLeftButtonUp += (_, e) =>
         {
             e.Handled = true;
-            AnimateClick(container, () => LaunchApp(item));
+            if (_isDockDragging)
+            {
+                container.ReleaseMouseCapture();
+                _isDockDragging = false;
+                var curPos = e.GetPosition(this);
+                if (curPos.Y < -15)
+                {
+                    _config = DockRules.RemoveItem(_config, item.Id);
+                    SaveConfig();
+                    Render();
+                }
+                else
+                {
+                    SaveConfig();
+                    Render();
+                }
+            }
+            else
+            {
+                AnimateClick(container, () => LaunchApp(item));
+            }
         };
 
         // Context menu
@@ -822,5 +906,34 @@ public sealed class DockBarWindow : Window
             config.Items.Add(new DockItem { Name = c.Name, TargetPath = c.Path, Order = order++ });
         }
         return config;
+    }
+
+    private void OnItemsPanelMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_isDockDragging) return;
+        var pos = e.GetPosition(_itemsPanel);
+        foreach (var child in _itemsPanel.Children)
+        {
+            if (child is FrameworkElement el && el.RenderTransform is ScaleTransform st)
+            {
+                var center = el.TranslatePoint(new Point(el.ActualWidth / 2, el.ActualHeight / 2), _itemsPanel);
+                double dist = Math.Abs(pos.X - center.X);
+                // Gaussian magnification wave (macOS dock style)
+                double target = 1.0 + 0.22 * Math.Exp(-Math.Pow(dist / 44.0, 2));
+                st.ScaleX = target;
+                st.ScaleY = target;
+            }
+        }
+    }
+
+    private void OnItemsPanelMouseLeave(object sender, MouseEventArgs e)
+    {
+        foreach (var child in _itemsPanel.Children)
+        {
+            if (child is FrameworkElement el && el.RenderTransform is ScaleTransform st)
+            {
+                AnimateScale(st, 1.0);
+            }
+        }
     }
 }
