@@ -45,8 +45,8 @@ public sealed class PhotoClotheslineWidget : Grid
 {
     private const string DragPhotoFormat = "TrifoldDesk.HangingPhoto";
     private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".bmp", ".webp", ".gif"];
-    private static readonly Queue<(string Hash, DateTime Utc)> RecentHungSignatures = new();
-    private static DateTime _lastAnyHungUtc = DateTime.MinValue;
+    private static readonly Dictionary<string, DateTime> _recentAutoHangSignatures = new();
+    private static readonly object _sigLock = new();
 
     private readonly string _id;
     private readonly ConfigManager _store;
@@ -55,18 +55,18 @@ public sealed class PhotoClotheslineWidget : Grid
     private readonly StackPanel _line = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(4, 0, 4, 0), VerticalAlignment = VerticalAlignment.Top };
     private readonly ScrollViewer _scroll = new()
     {
-        HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+        HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
         VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
         CanContentScroll = false,
         Focusable = false,
         Background = Brushes.Transparent,
-        Margin = new Thickness(12, 0, 12, 0)
+        Margin = new Thickness(6, 0, 6, 0)
     };
     private readonly TextBlock _status = new() { FontSize = 11, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly Border _emptyHint = new() { CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Padding = new Thickness(12, 14, 12, 14), Margin = new Thickness(8, 18, 8, 8), Cursor = Cursors.Hand };
     private readonly Dictionary<string, (RotateTransform Transform, double BaseTilt, double Amplitude, long StartTick)> _swaying = [];
     private readonly DispatcherTimer _swayTimer = new(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(33) };
-    private readonly DispatcherTimer _clipboardWatcherTimer = new() { Interval = TimeSpan.FromMilliseconds(600) };
+    private readonly DispatcherTimer _clipboardWatcherTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private FileSystemWatcher? _watcher;
     private Point _panStartPoint;
     private double _panStartOffset;
@@ -74,6 +74,8 @@ public sealed class PhotoClotheslineWidget : Grid
     private bool _hasPanned;
     private uint _lastClipboardSeq;
     private Button? _autoBtn;
+    private Button? _scrollLeftBtn;
+    private Button? _scrollRightBtn;
 
     [DllImport("user32.dll")]
     private static extern uint GetClipboardSequenceNumber();
@@ -132,20 +134,12 @@ public sealed class PhotoClotheslineWidget : Grid
         var pickBtn = QuickButton("＋ 选图", "选择本地图片挂到绳子上", darkText);
         pickBtn.Click += (_, _) => ChooseImages();
 
-        var prevBtn = QuickButton("‹", "向左滑动挂绳", darkText);
-        prevBtn.Click += (_, _) => _scroll.ScrollToHorizontalOffset(Math.Max(0, _scroll.HorizontalOffset - 150));
-
-        var nextBtn = QuickButton("›", "向右滑动挂绳", darkText);
-        nextBtn.Click += (_, _) => _scroll.ScrollToHorizontalOffset(_scroll.HorizontalOffset + 150);
-
         var clearBtn = QuickButton("🧹 清空", "一键摘下绳上所有截图（保留原图不删除）", darkText);
         clearBtn.Click += (_, _) => ClearAllPhotos();
 
         actions.Children.Add(_autoBtn);
         actions.Children.Add(pasteBtn);
         actions.Children.Add(pickBtn);
-        actions.Children.Add(prevBtn);
-        actions.Children.Add(nextBtn);
         actions.Children.Add(clearBtn);
         topBar.Children.Add(actions);
         Children.Add(topBar);
@@ -208,6 +202,7 @@ public sealed class PhotoClotheslineWidget : Grid
             {
                 _hasPanned = true;
                 _scroll.CaptureMouse();
+                _scroll.Cursor = Cursors.SizeWE;
             }
             if (_hasPanned)
             {
@@ -223,12 +218,61 @@ public sealed class PhotoClotheslineWidget : Grid
                 if (_hasPanned)
                 {
                     _scroll.ReleaseMouseCapture();
+                    _scroll.Cursor = Cursors.Arrow;
                     e.Handled = true;
                 }
             }
         };
 
         stage.Children.Add(_scroll);
+
+        // Soft Edge Fades for smooth entry/exit
+        var leftFade = new Border
+        {
+            Width = 14,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            IsHitTestVisible = false,
+            Background = new LinearGradientBrush(
+                Color.FromArgb(45, 0, 0, 0),
+                Colors.Transparent,
+                new Point(0, 0.5),
+                new Point(1, 0.5))
+        };
+        Panel.SetZIndex(leftFade, 15);
+        stage.Children.Add(leftFade);
+
+        var rightFade = new Border
+        {
+            Width = 14,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            IsHitTestVisible = false,
+            Background = new LinearGradientBrush(
+                Colors.Transparent,
+                Color.FromArgb(45, 0, 0, 0),
+                new Point(0, 0.5),
+                new Point(1, 0.5))
+        };
+        Panel.SetZIndex(rightFade, 15);
+        stage.Children.Add(rightFade);
+
+        // Sleek floating circular acrylic navigation chevrons
+        _scrollLeftBtn = CreateFloatingNavButton("‹", darkText);
+        _scrollLeftBtn.HorizontalAlignment = HorizontalAlignment.Left;
+        _scrollLeftBtn.Margin = new Thickness(4, 0, 0, 0);
+        Panel.SetZIndex(_scrollLeftBtn, 20);
+        _scrollLeftBtn.Click += (_, _) => _scroll.ScrollToHorizontalOffset(Math.Max(0, _scroll.HorizontalOffset - 160));
+
+        _scrollRightBtn = CreateFloatingNavButton("›", darkText);
+        _scrollRightBtn.HorizontalAlignment = HorizontalAlignment.Right;
+        _scrollRightBtn.Margin = new Thickness(0, 0, 4, 0);
+        Panel.SetZIndex(_scrollRightBtn, 20);
+        _scrollRightBtn.Click += (_, _) => _scroll.ScrollToHorizontalOffset(_scroll.HorizontalOffset + 160);
+
+        stage.Children.Add(_scrollLeftBtn);
+        stage.Children.Add(_scrollRightBtn);
+
+        _scroll.ScrollChanged += (_, _) => UpdateNavButtons();
+
         Children.Add(stage);
 
         // Entire widget wheel scrolls the clothesline horizontally
@@ -396,36 +440,123 @@ public sealed class PhotoClotheslineWidget : Grid
         }
     }
 
-    private static bool IsDuplicateAutoScreenshot(BitmapSource bmp)
+    private static Button CreateFloatingNavButton(string chevron, bool darkText)
     {
-        var now = DateTime.UtcNow;
-        if ((now - _lastAnyHungUtc).TotalMilliseconds < 1200)
-            return true;
+        var btn = new Button
+        {
+            Width = 24,
+            Height = 24,
+            Focusable = false,
+            Cursor = Cursors.Hand,
+            Visibility = Visibility.Collapsed,
+            Padding = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = new SolidColorBrush(darkText ? Color.FromArgb(175, 240, 246, 250) : Color.FromArgb(180, 20, 32, 42)),
+            BorderBrush = new SolidColorBrush(darkText ? Color.FromArgb(180, 100, 130, 145) : Color.FromArgb(160, 140, 175, 195)),
+            BorderThickness = new Thickness(1),
+            Content = new TextBlock
+            {
+                Text = chevron,
+                FontSize = 13,
+                FontWeight = FontWeights.Bold,
+                TextAlignment = TextAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = new SolidColorBrush(darkText ? Color.FromRgb(20, 35, 45) : Color.FromRgb(240, 248, 255)),
+                Margin = new Thickness(chevron == "‹" ? -1 : 1, -2, 0, 0)
+            },
+            Effect = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                Color = Colors.Black,
+                BlurRadius = 8,
+                ShadowDepth = 1,
+                Opacity = 0.45
+            }
+        };
 
-        string hash = ComputeImageSignature(bmp);
-        var cutoff = now.AddSeconds(-6);
-        while (RecentHungSignatures.Count > 0 && RecentHungSignatures.Peek().Utc < cutoff)
-            RecentHungSignatures.Dequeue();
+        var template = new ControlTemplate(typeof(Button));
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(12));
+        border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+        border.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
+        border.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(Control.BorderThicknessProperty));
+        var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+        presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+        border.AppendChild(presenter);
+        template.VisualTree = border;
+        btn.Template = template;
 
-        if (RecentHungSignatures.Any(r => r.Hash == hash))
-            return true;
-
-        RecentHungSignatures.Enqueue((hash, now));
-        _lastAnyHungUtc = now;
-        return false;
+        return btn;
     }
 
-    private void ClipboardWatcherTick(object? sender, EventArgs e)
+    private void UpdateNavButtons()
+    {
+        if (_scrollLeftBtn == null || _scrollRightBtn == null) return;
+        double scrollable = _scroll.ScrollableWidth;
+        if (scrollable <= 3)
+        {
+            _scrollLeftBtn.Visibility = Visibility.Collapsed;
+            _scrollRightBtn.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            _scrollLeftBtn.Visibility = _scroll.HorizontalOffset > 4 ? Visibility.Visible : Visibility.Collapsed;
+            _scrollRightBtn.Visibility = _scroll.HorizontalOffset < scrollable - 4 ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
+    private static bool IsDuplicateAutoScreenshot(BitmapSource bmp)
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            string hash = ComputeImageSignature(bmp);
+
+            lock (_sigLock)
+            {
+                var expired = _recentAutoHangSignatures.Where(kv => (now - kv.Value).TotalSeconds > 20).Select(kv => kv.Key).ToList();
+                foreach (var k in expired) _recentAutoHangSignatures.Remove(k);
+
+                if (_recentAutoHangSignatures.TryGetValue(hash, out var lastUtc) && (now - lastUtc).TotalSeconds < 4.0)
+                    return true;
+
+                _recentAutoHangSignatures[hash] = now;
+                return false;
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async void ClipboardWatcherTick(object? sender, EventArgs e)
     {
         if (!_data.AutoWatchScreenshots) return;
         try
         {
             uint seq = GetClipboardSequenceNumber();
             if (seq == _lastClipboardSeq || seq == 0) return;
-            _lastClipboardSeq = seq;
-            if (Clipboard.ContainsImage() && Clipboard.GetImage() is BitmapSource bmp)
+
+            BitmapSource? bmp = null;
+            for (int r = 0; r < 3; r++)
             {
-                if (IsDuplicateAutoScreenshot(bmp)) return;
+                try
+                {
+                    if (Clipboard.ContainsImage() && Clipboard.GetImage() is BitmapSource img)
+                    {
+                        bmp = img;
+                        break;
+                    }
+                }
+                catch { }
+                if (r < 2) await Task.Delay(60);
+            }
+
+            _lastClipboardSeq = seq;
+            if (bmp != null && IsLoaded && _data.AutoWatchScreenshots)
+            {
                 HangBitmap(bmp, DateTime.Now.ToString("HH:mm 自动截图"), isAuto: true);
             }
         }
@@ -437,19 +568,21 @@ public sealed class PhotoClotheslineWidget : Grid
         try
         {
             int w = bmp.PixelWidth, h = bmp.PixelHeight;
-            var formatted = new FormatConvertedBitmap(bmp, PixelFormats.Bgra32, null, 0);
-            int sampleW = Math.Min(32, w);
-            int sampleH = Math.Min(32, h);
-            var cropped = new CroppedBitmap(formatted, new Int32Rect(0, 0, sampleW, sampleH));
-            int stride = sampleW * 4;
-            byte[] pixels = new byte[stride * sampleH];
-            cropped.CopyPixels(pixels, stride, 0);
+            if (w <= 0 || h <= 0) return Guid.NewGuid().ToString("N");
+
+            var scale = new ScaleTransform(16.0 / w, 16.0 / h);
+            var scaled = new TransformedBitmap(bmp, scale);
+            var formatted = new FormatConvertedBitmap(scaled, PixelFormats.Bgra32, null, 0);
+
+            byte[] pixels = new byte[16 * 16 * 4];
+            formatted.CopyPixels(pixels, 16 * 4, 0);
+
             using var md5 = MD5.Create();
             return $"{w}x{h}_" + Convert.ToHexString(md5.ComputeHash(pixels));
         }
         catch
         {
-            return $"{bmp.PixelWidth}x{bmp.PixelHeight}";
+            return $"{bmp.PixelWidth}x{bmp.PixelHeight}_{bmp.Format}";
         }
     }
 
@@ -476,7 +609,6 @@ public sealed class PhotoClotheslineWidget : Grid
         {
             if (Clipboard.ContainsImage() && Clipboard.GetImage() is BitmapSource image)
             {
-                _lastAnyHungUtc = DateTime.UtcNow;
                 HangBitmap(image, DateTime.Now.ToString("HH:mm 剪贴板截图"));
                 return;
             }
@@ -638,6 +770,7 @@ public sealed class PhotoClotheslineWidget : Grid
             if (item.Id == newlyHungId)
                 TriggerSway(item.Id, rotate, item.TiltDegrees, 5.5);
         }
+        UpdateNavButtons();
     }
 
     private FrameworkElement BuildPhotoCard(HangingPhotoItem item, int index, out RotateTransform rotate)
@@ -647,15 +780,15 @@ public sealed class PhotoClotheslineWidget : Grid
 
         var bmp = LoadBitmap(item.ImagePath, 900);
         double scale = item.Scale > 0 ? item.Scale : 1.0;
-        double cardHeight = Math.Clamp(125 * scale, 75, 230);
+        double cardHeight = Math.Clamp(75 * scale, 45, 180);
         double aspect = (bmp != null && bmp.PixelHeight > 0) ? (double)bmp.PixelWidth / bmp.PixelHeight : 1.33;
-        double cardWidth = Math.Clamp(cardHeight * aspect, 60 * scale, 270 * scale);
+        double cardWidth = Math.Clamp(cardHeight * aspect, 42 * scale, 175 * scale);
 
         var container = new Grid
         {
-            Width = cardWidth + 10,
-            Height = cardHeight + 18,
-            Margin = new Thickness(4, 2, 4, 4),
+            Width = cardWidth + 8,
+            Height = cardHeight + 14,
+            Margin = new Thickness(3, 1, 3, 2),
             RenderTransformOrigin = new Point(0.5, 0.05),
             RenderTransform = rotate,
             Cursor = Cursors.Hand,
@@ -666,20 +799,20 @@ public sealed class PhotoClotheslineWidget : Grid
 
         var cardFrame = new Border
         {
-            Margin = new Thickness(2, 8, 2, 0),
+            Margin = new Thickness(2, 6, 2, 0),
             Width = cardWidth,
             Height = cardHeight,
             Background = new SolidColorBrush(darkText ? Color.FromArgb(16, 30, 50, 60) : Color.FromArgb(20, 255, 255, 255)),
             BorderBrush = new SolidColorBrush(darkText ? Color.FromArgb(70, 30, 50, 60) : Color.FromArgb(80, 255, 255, 255)),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(5),
+            CornerRadius = new CornerRadius(4),
             ClipToBounds = true,
             Effect = new System.Windows.Media.Effects.DropShadowEffect
             {
                 Color = Colors.Black,
-                BlurRadius = 8,
-                ShadowDepth = 2,
-                Opacity = 0.38
+                BlurRadius = 6,
+                ShadowDepth = 1.5,
+                Opacity = 0.35
             }
         };
 
@@ -701,7 +834,7 @@ public sealed class PhotoClotheslineWidget : Grid
             contentGrid.Children.Add(new TextBlock
             {
                 Text = "图片缺失",
-                FontSize = 10,
+                FontSize = 9.5,
                 Foreground = Brushes.Gray,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
@@ -711,15 +844,15 @@ public sealed class PhotoClotheslineWidget : Grid
         var captionBar = new Border
         {
             VerticalAlignment = VerticalAlignment.Bottom,
-            Background = new SolidColorBrush(Color.FromArgb(155, 12, 22, 28)),
-            Padding = new Thickness(4, 2, 4, 2),
-            CornerRadius = new CornerRadius(0, 0, 4, 4),
+            Background = new SolidColorBrush(Color.FromArgb(145, 12, 22, 28)),
+            Padding = new Thickness(3, 1, 3, 1),
+            CornerRadius = new CornerRadius(0, 0, 3, 3),
             Opacity = 0.85
         };
         var caption = new TextBlock
         {
             Text = string.IsNullOrWhiteSpace(item.Title) ? "截图" : item.Title,
-            FontSize = 9.5,
+            FontSize = 9.0,
             Foreground = Brushes.WhiteSmoke,
             TextAlignment = TextAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
@@ -729,21 +862,21 @@ public sealed class PhotoClotheslineWidget : Grid
         cardFrame.Child = contentGrid;
         container.Children.Add(cardFrame);
 
-        var clip = new Grid { Width = 10, Height = 16, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top };
+        var clip = new Grid { Width = 8, Height = 13, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top };
         clip.Children.Add(new Border
         {
             Background = new LinearGradientBrush(Color.FromRgb(222, 176, 118), Color.FromRgb(186, 136, 78), 0),
             BorderBrush = new SolidColorBrush(Color.FromRgb(138, 96, 48)),
             BorderThickness = new Thickness(0.8),
-            CornerRadius = new CornerRadius(2)
+            CornerRadius = new CornerRadius(1.5)
         });
         clip.Children.Add(new Border
         {
-            Height = 2.5,
-            Margin = new Thickness(1, 5.5, 1, 0),
+            Height = 2.0,
+            Margin = new Thickness(1, 4.5, 1, 0),
             VerticalAlignment = VerticalAlignment.Top,
             Background = new SolidColorBrush(Color.FromRgb(130, 146, 156)),
-            CornerRadius = new CornerRadius(1)
+            CornerRadius = new CornerRadius(0.8)
         });
         container.Children.Add(clip);
 
