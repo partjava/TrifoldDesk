@@ -188,6 +188,12 @@ public sealed class PhotoClotheslineWidget : Grid
         // Stage pan dragging: mouse drag anywhere on the stage slides smoothly
         _scroll.PreviewMouseLeftButtonDown += (_, e) =>
         {
+            if (e.OriginalSource is DependencyObject dep && FindAncestorCard(dep) != null)
+            {
+                _isPanningStage = false;
+                _hasPanned = false;
+                return;
+            }
             _panStartPoint = e.GetPosition(_scroll);
             _panStartOffset = _scroll.HorizontalOffset;
             _isPanningStage = true;
@@ -506,7 +512,7 @@ public sealed class PhotoClotheslineWidget : Grid
         }
     }
 
-    private static bool IsDuplicateAutoScreenshot(BitmapSource bmp)
+    private bool IsDuplicateAutoScreenshot(BitmapSource bmp)
     {
         try
         {
@@ -515,11 +521,27 @@ public sealed class PhotoClotheslineWidget : Grid
 
             lock (_sigLock)
             {
-                var expired = _recentAutoHangSignatures.Where(kv => (now - kv.Value).TotalSeconds > 20).Select(kv => kv.Key).ToList();
+                var expired = _recentAutoHangSignatures.Where(kv => (now - kv.Value).TotalSeconds > 20 && kv.Value <= now).Select(kv => kv.Key).ToList();
                 foreach (var k in expired) _recentAutoHangSignatures.Remove(k);
 
-                if (_recentAutoHangSignatures.TryGetValue(hash, out var lastUtc) && (now - lastUtc).TotalSeconds < 4.0)
-                    return true;
+                if (_recentAutoHangSignatures.TryGetValue(hash, out var expireUtc))
+                {
+                    if (expireUtc > now || (now - expireUtc).TotalSeconds < 4.0)
+                        return true;
+                }
+
+                // If this exact image is already hanging on the rope, never create a duplicate!
+                foreach (var existing in _data.Items)
+                {
+                    if (File.Exists(existing.ImagePath))
+                    {
+                        var existingBmp = LoadBitmap(existing.ImagePath);
+                        if (existingBmp != null && ComputeImageSignature(existingBmp) == hash)
+                        {
+                            return true;
+                        }
+                    }
+                }
 
                 _recentAutoHangSignatures[hash] = now;
                 return false;
@@ -544,11 +566,8 @@ public sealed class PhotoClotheslineWidget : Grid
             {
                 try
                 {
-                    if (Clipboard.ContainsImage() && Clipboard.GetImage() is BitmapSource img)
-                    {
-                        bmp = img;
-                        break;
-                    }
+                    bmp = TryGetClipboardImage();
+                    if (bmp != null) break;
                 }
                 catch { }
                 if (r < 2) await Task.Delay(60);
@@ -561,6 +580,152 @@ public sealed class PhotoClotheslineWidget : Grid
             }
         }
         catch { }
+    }
+
+    private static FrameworkElement? FindAncestorCard(DependencyObject? current)
+    {
+        while (current != null)
+        {
+            if (current is FrameworkElement fe && fe.Tag is HangingPhotoItem) return fe;
+            if (current is Visual || current is System.Windows.Media.Media3D.Visual3D)
+                current = VisualTreeHelper.GetParent(current);
+            else
+                current = LogicalTreeHelper.GetParent(current);
+        }
+        return null;
+    }
+
+    private static BitmapSource? TryGetClipboardImage()
+    {
+        try
+        {
+            var data = Clipboard.GetDataObject();
+            if (data == null) return null;
+
+            // 1. Raw PNG / image/png stream (Chromium, Edge, Firefox, WeChat webview, etc.)
+            foreach (var format in new[] { "PNG", "image/png" })
+            {
+                if (data.GetDataPresent(format))
+                {
+                    object? raw = data.GetData(format);
+                    if (raw is MemoryStream ms)
+                    {
+                        var decoded = DecodeBitmapStream(ms);
+                        if (decoded != null) return SanitizeBitmapAlpha(decoded);
+                    }
+                    else if (raw is byte[] bytes)
+                    {
+                        using var msBytes = new MemoryStream(bytes);
+                        var decoded = DecodeBitmapStream(msBytes);
+                        if (decoded != null) return SanitizeBitmapAlpha(decoded);
+                    }
+                }
+            }
+
+            // 2. Raw JPEG / GIF / BMP streams
+            foreach (var format in new[] { "JFIF", "image/jpeg", "image/gif", "image/bmp", "Bitmap" })
+            {
+                if (data.GetDataPresent(format))
+                {
+                    object? raw = data.GetData(format);
+                    if (raw is MemoryStream ms)
+                    {
+                        var decoded = DecodeBitmapStream(ms);
+                        if (decoded != null) return SanitizeBitmapAlpha(decoded);
+                    }
+                    else if (raw is BitmapSource bs)
+                    {
+                        return SanitizeBitmapAlpha(bs);
+                    }
+                }
+            }
+
+            // 3. DeviceIndependentBitmap (CF_DIB)
+            if (Clipboard.ContainsImage())
+            {
+                var img = Clipboard.GetImage();
+                if (img != null) return SanitizeBitmapAlpha(img);
+            }
+
+            // 4. File drop list containing image files
+            if (Clipboard.ContainsFileDropList())
+            {
+                var files = Clipboard.GetFileDropList().Cast<string>().Where(File.Exists).ToArray();
+                foreach (var file in files)
+                {
+                    string ext = Path.GetExtension(file).ToLowerInvariant();
+                    if (ImageExtensions.Contains(ext))
+                    {
+                        var loaded = LoadBitmap(file);
+                        if (loaded != null) return SanitizeBitmapAlpha(loaded);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log(ex);
+        }
+        return null;
+    }
+
+    private static BitmapSource? DecodeBitmapStream(Stream stream)
+    {
+        try
+        {
+            if (stream.CanSeek) stream.Position = 0;
+            var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
+            if (decoder.Frames.Count > 0)
+            {
+                var frame = decoder.Frames[0];
+                frame.Freeze();
+                return frame;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    private static BitmapSource SanitizeBitmapAlpha(BitmapSource bmp)
+    {
+        try
+        {
+            if (bmp.Format != PixelFormats.Bgra32 && bmp.Format != PixelFormats.Pbgra32)
+            {
+                return bmp;
+            }
+
+            int w = bmp.PixelWidth;
+            int h = bmp.PixelHeight;
+            if (w <= 0 || h <= 0) return bmp;
+
+            int stride = w * 4;
+            byte[] pixels = new byte[stride * h];
+            bmp.CopyPixels(pixels, stride, 0);
+
+            bool hasNonZeroAlpha = false;
+            for (int i = 3; i < pixels.Length; i += 4)
+            {
+                if (pixels[i] != 0)
+                {
+                    hasNonZeroAlpha = true;
+                    break;
+                }
+            }
+
+            if (!hasNonZeroAlpha)
+            {
+                for (int i = 3; i < pixels.Length; i += 4)
+                {
+                    pixels[i] = 255;
+                }
+                var fixedBmp = BitmapSource.Create(w, h, bmp.DpiX > 0 ? bmp.DpiX : 96, bmp.DpiY > 0 ? bmp.DpiY : 96, PixelFormats.Bgra32, null, pixels, stride);
+                fixedBmp.Freeze();
+                return fixedBmp;
+            }
+        }
+        catch { }
+        return bmp;
     }
 
     private static string ComputeImageSignature(BitmapSource bmp)
@@ -589,6 +754,7 @@ public sealed class PhotoClotheslineWidget : Grid
     public bool HangBitmap(BitmapSource bitmap, string? title = null, bool isAuto = false)
     {
         ArgumentNullException.ThrowIfNull(bitmap);
+        bitmap = SanitizeBitmapAlpha(bitmap);
         if (isAuto && IsDuplicateAutoScreenshot(bitmap)) return false;
 
         string itemId = Guid.NewGuid().ToString("N");
@@ -607,7 +773,8 @@ public sealed class PhotoClotheslineWidget : Grid
     {
         try
         {
-            if (Clipboard.ContainsImage() && Clipboard.GetImage() is BitmapSource image)
+            var image = TryGetClipboardImage();
+            if (image != null)
             {
                 HangBitmap(image, DateTime.Now.ToString("HH:mm 剪贴板截图"));
                 return;
@@ -621,7 +788,7 @@ public sealed class PhotoClotheslineWidget : Grid
                     return;
                 }
             }
-            _status.Text = "剪贴板里暂无截图，可按 Win+Shift+S 截图";
+            _status.Text = "剪贴板里暂无截图，可按 Win+Shift+S 截图或右键复制图片";
         }
         catch (Exception ex)
         {
@@ -792,7 +959,7 @@ public sealed class PhotoClotheslineWidget : Grid
             RenderTransformOrigin = new Point(0.5, 0.05),
             RenderTransform = rotate,
             Cursor = Cursors.Hand,
-            ToolTip = $"{item.Title}\n单击：置顶放大参考\n滚轮：左右滑动挂绳\nCtrl+滚轮：缩放大小 ({(int)(scale * 100)}%)\n右键：更多操作"
+            ToolTip = $"{item.Title}\n单击：置顶放大参考\n按住拖拽：发送到微信/QQ/桌面\n滚轮：左右滑动挂绳\nCtrl+滚轮：缩放大小 ({(int)(scale * 100)}%)\n右键：更多操作"
         };
 
         bool darkText = TextContrast.IsDarkTextStyle(_style);
@@ -900,18 +1067,101 @@ public sealed class PhotoClotheslineWidget : Grid
             }
         };
 
+        container.Tag = item;
+        container.AllowDrop = true;
         Point cardPressPoint = default;
+        bool isCardDragging = false;
+        long lastDragEndTick = 0;
+
         container.PreviewMouseLeftButtonDown += (_, e) =>
         {
             cardPressPoint = e.GetPosition(this);
+            isCardDragging = false;
+            _isPanningStage = false;
         };
-        container.MouseLeftButtonUp += (_, e) =>
+
+        container.PreviewMouseMove += (_, e) =>
         {
-            if (_hasPanned) return;
+            if (e.LeftButton != MouseButtonState.Pressed || isCardDragging) return;
+            var cur = e.GetPosition(this);
+            if (Math.Abs(cur.X - cardPressPoint.X) >= SystemParameters.MinimumHorizontalDragDistance ||
+                Math.Abs(cur.Y - cardPressPoint.Y) >= SystemParameters.MinimumVerticalDragDistance)
+            {
+                isCardDragging = true;
+                _isPanningStage = false;
+
+                var data = new DataObject();
+                string fullPath = Path.GetFullPath(item.ImagePath);
+                if (File.Exists(fullPath))
+                {
+                    var files = new System.Collections.Specialized.StringCollection { fullPath };
+                    data.SetFileDropList(files);
+                    data.SetData(DataFormats.FileDrop, new[] { fullPath });
+                }
+                if (bmp != null)
+                {
+                    data.SetData(DataFormats.Bitmap, bmp);
+                }
+                data.SetData(DragPhotoFormat, item.Id);
+
+                try
+                {
+                    DragDrop.DoDragDrop(container, data, DragDropEffects.Copy | DragDropEffects.Move | DragDropEffects.Link);
+                }
+                catch (Exception ex)
+                {
+                    App.Log(ex);
+                }
+                finally
+                {
+                    isCardDragging = false;
+                    lastDragEndTick = Environment.TickCount64;
+                }
+                e.Handled = true;
+            }
+        };
+
+        container.PreviewMouseLeftButtonUp += (_, e) =>
+        {
+            if (isCardDragging || Environment.TickCount64 - lastDragEndTick < 200)
+            {
+                isCardDragging = false;
+                e.Handled = true;
+                return;
+            }
             var upPoint = e.GetPosition(this);
             if (Math.Abs(upPoint.X - cardPressPoint.X) < 6 && Math.Abs(upPoint.Y - cardPressPoint.Y) < 6)
             {
                 OpenViewer(item, false);
+                e.Handled = true;
+            }
+        };
+
+        container.DragOver += (_, e) =>
+        {
+            if (e.Data.GetDataPresent(DragPhotoFormat))
+            {
+                e.Effects = DragDropEffects.Move;
+                e.Handled = true;
+            }
+            else if (HasImageDrop(e.Data))
+            {
+                e.Effects = DragDropEffects.Copy;
+                e.Handled = true;
+            }
+        };
+
+        container.Drop += (_, e) =>
+        {
+            if (e.Data.GetData(DragPhotoFormat) is string sourceId && sourceId != item.Id)
+            {
+                var next = PhotoLineRules.MovePhoto(_data, sourceId, item.Id);
+                if (Save(next)) Render(sourceId);
+                e.Handled = true;
+            }
+            else if (e.Data.GetData(DataFormats.FileDrop) is string[] files)
+            {
+                HangFiles(files);
                 e.Handled = true;
             }
         };
@@ -1039,8 +1289,25 @@ public sealed class PhotoClotheslineWidget : Grid
             var bmp = LoadBitmap(item.ImagePath);
             if (bmp != null)
             {
-                Clipboard.SetImage(bmp);
-                _status.Text = "已复制图片到剪贴板";
+                string sig = ComputeImageSignature(bmp);
+                lock (_sigLock)
+                {
+                    _recentAutoHangSignatures[sig] = DateTime.UtcNow.AddMinutes(10);
+                }
+
+                var data = new DataObject();
+                data.SetData(DataFormats.Bitmap, bmp);
+                string fullPath = Path.GetFullPath(item.ImagePath);
+                if (File.Exists(fullPath))
+                {
+                    var files = new System.Collections.Specialized.StringCollection { fullPath };
+                    data.SetFileDropList(files);
+                    data.SetData(DataFormats.FileDrop, new[] { fullPath });
+                }
+                Clipboard.SetDataObject(data, true);
+
+                _lastClipboardSeq = GetClipboardSequenceNumber();
+                _status.Text = "已复制图片到剪贴板，可直接在微信/QQ/文档中粘贴";
             }
         }
         catch (Exception ex)
