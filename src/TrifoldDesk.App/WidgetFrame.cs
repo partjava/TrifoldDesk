@@ -73,27 +73,29 @@ public sealed class WidgetFrame : Border
         ClipToBounds = true;
         if (model.PluginId == "folder") CornerRadius = new CornerRadius(10);
         bool folderFrame = model.PluginId == "folder";
-        var grid = _grid; grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(folderFrame ? 4 : (model.PluginId == "clock" && !model.IsCollapsed) ? 12 : 36) }); grid.RowDefinitions.Add(new RowDefinition()); Child = grid;
-        var header = new Grid { Margin = new Thickness(12, 0, 10, 0) }; grid.Children.Add(header);
+        var grid = _grid; grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(folderFrame ? 4 : model.IsCollapsed ? 48 : 8) }); grid.RowDefinitions.Add(new RowDefinition()); Child = grid;
+        var header = new Grid { Margin = new Thickness(10, 0, 8, 0) };
+        Grid.SetRowSpan(header, 2); Panel.SetZIndex(header, 1);
+        grid.Children.Add(header);
         _move.Cursor = Cursors.SizeAll; _move.Background = Brushes.Transparent;
+        _move.VerticalAlignment = VerticalAlignment.Top; _move.Height = folderFrame ? 4 : 14;
         var transparent = new FrameworkElementFactory(typeof(Border)); transparent.SetValue(Border.BackgroundProperty, Brushes.Transparent);
         _move.Template = new ControlTemplate(typeof(Thumb)) { VisualTree = transparent }; header.Children.Add(_move);
         _title.TextTrimming = TextTrimming.CharacterEllipsis; _title.FontSize = 11; _title.FontWeight = FontWeights.SemiBold;
         if (themed && TextContrast.IsDarkTextStyle(model.Style)) _title.Foreground = new SolidColorBrush(Color.FromRgb(32, 52, 60));
         else if (model.Style == "glass") _title.Effect = TextContrast.Shadow;
         _title.VerticalAlignment = VerticalAlignment.Center; _title.Margin = new Thickness(0, 0, 8, 0); _title.IsHitTestVisible = false; header.Children.Add(_title);
-        if (folderFrame) { _title.Visibility = Visibility.Collapsed; ToolTip = model.Title; }
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center }; header.Children.Add(actions);
+        _title.Visibility = model.IsCollapsed ? Visibility.Visible : Visibility.Collapsed;
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = model.IsCollapsed ? VerticalAlignment.Center : VerticalAlignment.Top, Margin = model.IsCollapsed ? new Thickness(0) : new Thickness(0, 3, 0, 0) }; header.Children.Add(actions);
         _actions = actions;
-        actions.Visibility = Visibility.Collapsed;
+        actions.Visibility = Visibility.Visible;
         actions.Opacity = model.IsCollapsed ? 1 : 0;
         MouseEnter += (_, _) => { actions.Opacity = 1; _resize.Opacity = 1; if (folderFrame) BorderBrush = new SolidColorBrush(Color.FromArgb(50, 255, 255, 255)); };
         MouseLeave += (_, _) => { if (!Model.IsCollapsed) actions.Opacity = 0; _resize.Opacity = 0; if (folderFrame) BorderBrush = Brushes.Transparent; };
-        foreach (var button in new[] { _lock, _fold }) { button.Padding = new Thickness(7, 4, 7, 4); button.FontSize = 11; button.Margin = new Thickness(3, 0, 0, 0); actions.Children.Add(button); }
+        foreach (var button in new[] { _lock, _fold }) { button.Padding = new Thickness(6, 2, 6, 2); button.FontSize = 10; button.Margin = new Thickness(3, 0, 0, 0); actions.Children.Add(button); }
         _lock.ToolTip = "锁定/解锁位置与尺寸"; _lock.Click += (_, _) => ChangeState(() => Model.IsLocked = !Model.IsLocked);
         _fold.ToolTip = "收起/展开"; _fold.Click += (_, _) => ToggleCollapsed();
-        var bodyHolder = new Border { Padding = folderFrame ? new Thickness(1, 0, 1, 4) : new Thickness(12, 0, 12, 16), Child = body }; Grid.SetRow(bodyHolder, 1); grid.Children.Add(bodyHolder);
-        if (folderFrame) { Grid.SetRowSpan(header,2); _move.Height=4; _move.VerticalAlignment=VerticalAlignment.Top; actions.VerticalAlignment = VerticalAlignment.Top; Panel.SetZIndex(header,1); }
+        var bodyHolder = new Border { Padding = folderFrame ? new Thickness(1, 0, 1, 4) : new Thickness(10, 8, 10, 10), Child = body }; Grid.SetRow(bodyHolder, 1); grid.Children.Add(bodyHolder);
         _resize.Width = 20; _resize.Height = 20; _resize.HorizontalAlignment = HorizontalAlignment.Right; _resize.VerticalAlignment = VerticalAlignment.Bottom; _resize.Cursor = Cursors.SizeNWSE;
         _resize.Width=12; _resize.Height=12;
         var resizeSurface=new FrameworkElementFactory(typeof(Border)); resizeSurface.SetValue(Border.BackgroundProperty,Brushes.Transparent);
@@ -215,15 +217,21 @@ public sealed class WidgetFrame : Border
     private void UpdateState()
     {
         bool folderFrame = Model.PluginId == "folder";
-        _title.Visibility = folderFrame || (Model.PluginId == "clock" && !Model.IsCollapsed) ? Visibility.Collapsed : Visibility.Visible;
-        if (_grid.RowDefinitions.Count > 0) _grid.RowDefinitions[0].Height = new GridLength(folderFrame ? 4 : (Model.PluginId == "clock" && !Model.IsCollapsed) ? 12 : 36);
+        _title.Visibility = Model.IsCollapsed ? Visibility.Visible : Visibility.Collapsed;
+        if (_grid.RowDefinitions.Count > 0) _grid.RowDefinitions[0].Height = new GridLength(Model.IsCollapsed ? 48 : (folderFrame ? 4 : 8));
         _title.Text = string.IsNullOrWhiteSpace(Model.Title) ? PluginRules.Catalog.First(p => p.Id == Model.PluginId).Name : Model.Title;
-        if (_body is FolderWidget) ToolTip=_title.Text;
+        ToolTip = _title.Text;
         _fold.Content = Model.IsCollapsed ? "展开" : "收起"; _lock.Content = Model.IsLocked ? "锁定" : "自由";
         bool phone = Model.IsCollapsed && _body is FolderWidget;
         _title.Margin = new Thickness(0,0,phone ? 34 : 8,0); _lock.Visibility = phone ? Visibility.Collapsed : Visibility.Visible;
         if (phone) _fold.Content = "↗";
-        if (_actions != null) _actions.Opacity = Model.IsCollapsed || IsMouseOver ? 1 : 0;
+        if (_actions != null)
+        {
+            _actions.VerticalAlignment = Model.IsCollapsed ? VerticalAlignment.Center : VerticalAlignment.Top;
+            _actions.Margin = Model.IsCollapsed ? new Thickness(0) : new Thickness(0, 3, 0, 0);
+            _actions.Opacity = Model.IsCollapsed || IsMouseOver ? 1 : 0;
+        }
+        _move.Height = Model.IsCollapsed ? 48 : (folderFrame ? 4 : 14);
         _resize.Opacity = IsMouseOver ? 1 : 0;
         if (_body is FolderWidget folder) folder.SetCompact(Model.IsCollapsed);
         _body.Visibility = Model.IsCollapsed && _body is not FolderWidget ? Visibility.Collapsed : Visibility.Visible; _resize.Visibility = Model.IsLocked || Model.IsCollapsed ? Visibility.Collapsed : Visibility.Visible;

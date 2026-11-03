@@ -51,10 +51,12 @@ public static class DesktopControlService
             foreach (dynamic monitor in (System.Collections.IEnumerable)collection!)
             {
                 try { return new BrightnessState(Convert.ToByte(monitor.CurrentBrightness), Convert.ToString(monitor.InstanceName) ?? ""); }
+                catch (COMException) { return null; }
                 finally { Release(monitor); }
             }
             return null;
         }
+        catch (COMException) { return null; }
         finally { Release(collection); Release(services); Release(locator); }
     }
     public static void SetBrightness(BrightnessState target, double value)
