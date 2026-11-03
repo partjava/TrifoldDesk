@@ -21,7 +21,7 @@ public sealed class DockConfig
     public bool Enabled { get; set; } = true;
     public double IconSize { get; set; } = 42;
     public bool AutoHide { get; set; } = true;
-    public bool AlwaysOnTop { get; set; } = true;
+    public bool AlwaysOnTop { get; set; } = false;
     public List<DockItem> Items { get; set; } = [];
 }
 

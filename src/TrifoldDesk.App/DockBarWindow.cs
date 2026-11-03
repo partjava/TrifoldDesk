@@ -631,7 +631,11 @@ public sealed class DockBarWindow : Window
 
     private void OpenInstalledAppsPicker()
     {
-        var picker = new InstalledAppsWindow { Owner = this };
+        var picker = new InstalledAppsWindow
+        {
+            Topmost = false,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen
+        };
         if (picker.ShowDialog() == true)
         {
             foreach (var app in picker.Selected)

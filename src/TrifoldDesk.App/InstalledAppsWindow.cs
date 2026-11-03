@@ -18,7 +18,7 @@ public sealed class InstalledAppsWindow : Window
     {
         Text = "搜索应用…",
         Foreground = new SolidColorBrush(Color.FromArgb(140, 255, 255, 255)),
-        FontSize = 12.5,
+        FontSize = 12,
         VerticalAlignment = VerticalAlignment.Center,
         IsHitTestVisible = false
     };
@@ -37,12 +37,13 @@ public sealed class InstalledAppsWindow : Window
     public InstalledAppsWindow()
     {
         Title = "添加应用";
-        Width = 740;
-        Height = 520;
+        Width = 720;
+        Height = 490;
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
+        Topmost = false;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         _catalog = InstalledAppsService.Read();
@@ -57,38 +58,38 @@ public sealed class InstalledAppsWindow : Window
 
     private void BuildUI()
     {
-        // Translucent frosted glass container (subtle, airy and translucent instead of solid black)
+        // Translucent frosted glass container (light, airy, non-black)
         var glass = new Border
         {
-            CornerRadius = new CornerRadius(24),
+            CornerRadius = new CornerRadius(22),
             Background = new LinearGradientBrush(
-                Color.FromArgb(105, 20, 28, 40),
-                Color.FromArgb(135, 12, 16, 24),
+                Color.FromArgb(80, 20, 26, 36),
+                Color.FromArgb(115, 12, 16, 24),
                 90),
             BorderBrush = new LinearGradientBrush(
-                Color.FromArgb(130, 255, 255, 255),
-                Color.FromArgb(35, 255, 255, 255),
+                Color.FromArgb(120, 255, 255, 255),
+                Color.FromArgb(30, 255, 255, 255),
                 45),
-            BorderThickness = new Thickness(1.4),
+            BorderThickness = new Thickness(1.2),
             Effect = new DropShadowEffect
             {
-                BlurRadius = 36,
-                ShadowDepth = 8,
+                BlurRadius = 32,
+                ShadowDepth = 6,
                 Direction = 270,
-                Opacity = 0.40,
+                Opacity = 0.35,
                 Color = Colors.Black
             },
             ClipToBounds = true
         };
 
         var mainGrid = new Grid();
-        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(54) }); // Sleek Search & Close header
-        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // Cards Grid
-        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(50) }); // Bottom Actions
+        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(42) }); // Compact Header
+        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // 5-column App Grid
+        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(46) }); // Compact Action Bar
 
         var shine = new Border
         {
-            Height = 1.2,
+            Height = 1.0,
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(32, 1, 32, 0),
             Background = new LinearGradientBrush
@@ -98,7 +99,7 @@ public sealed class InstalledAppsWindow : Window
                 GradientStops =
                 [
                     new(Color.FromArgb(0, 255, 255, 255), 0.0),
-                    new(Color.FromArgb(170, 255, 255, 255), 0.5),
+                    new(Color.FromArgb(160, 255, 255, 255), 0.5),
                     new(Color.FromArgb(0, 255, 255, 255), 1.0)
                 ]
             },
@@ -107,18 +108,18 @@ public sealed class InstalledAppsWindow : Window
         Grid.SetRowSpan(shine, 3);
         mainGrid.Children.Add(shine);
 
-        // Row 0: Centered capsule search bar + robust close button
+        // Row 0: Centered capsule search bar + guaranteed close button
         var header = BuildHeader();
         Grid.SetRow(header, 0);
         mainGrid.Children.Add(header);
 
-        // Row 1: App Cards with ultra-slim transparent scrollbar and edge-to-edge balanced margins
+        // Row 1: App Cards with ultra-slim transparent scrollbar (5 columns, zero left/right wasted space)
         var scrollViewer = new ScrollViewer
         {
             Content = _apps,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            Margin = new Thickness(16, 0, 16, 2)
+            Margin = new Thickness(12, 0, 12, 0)
         };
         ApplySlimScrollBarStyle(scrollViewer);
         Grid.SetRow(scrollViewer, 1);
@@ -143,7 +144,7 @@ public sealed class InstalledAppsWindow : Window
 
     private FrameworkElement BuildHeader()
     {
-        var bar = new Grid { Background = Brushes.Transparent, Margin = new Thickness(16, 8, 16, 4) };
+        var bar = new Grid { Background = Brushes.Transparent, Margin = new Thickness(14, 6, 14, 2) };
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
@@ -151,16 +152,16 @@ public sealed class InstalledAppsWindow : Window
         // Center: Sleek capsule search bar
         var searchContainer = new Border
         {
-            Width = 360,
-            Height = 35,
-            CornerRadius = new CornerRadius(17.5),
-            Background = new SolidColorBrush(Color.FromArgb(36, 255, 255, 255)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(65, 255, 255, 255)),
+            Width = 320,
+            Height = 30,
+            CornerRadius = new CornerRadius(15),
+            Background = new SolidColorBrush(Color.FromArgb(32, 255, 255, 255)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(55, 255, 255, 255)),
             BorderThickness = new Thickness(1),
             HorizontalAlignment = HorizontalAlignment.Center
         };
 
-        var searchGrid = new Grid { Margin = new Thickness(12, 0, 10, 0) };
+        var searchGrid = new Grid { Margin = new Thickness(10, 0, 8, 0) };
         searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -168,10 +169,10 @@ public sealed class InstalledAppsWindow : Window
         var searchIcon = new TextBlock
         {
             Text = "🔍",
-            FontSize = 12,
+            FontSize = 11.5,
             Foreground = new SolidColorBrush(Color.FromArgb(160, 255, 255, 255)),
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 8, 0)
+            Margin = new Thickness(0, 0, 6, 0)
         };
         Grid.SetColumn(searchIcon, 0);
         searchGrid.Children.Add(searchIcon);
@@ -181,7 +182,7 @@ public sealed class InstalledAppsWindow : Window
         _searchBox.BorderThickness = new Thickness(0);
         _searchBox.Foreground = Brushes.White;
         _searchBox.CaretBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#00E5FF"));
-        _searchBox.FontSize = 13;
+        _searchBox.FontSize = 12.5;
         _searchBox.VerticalAlignment = VerticalAlignment.Center;
         _searchBox.Padding = new Thickness(0);
 
@@ -193,7 +194,7 @@ public sealed class InstalledAppsWindow : Window
         var clearBtn = new TextBlock
         {
             Text = "✕",
-            FontSize = 12,
+            FontSize = 11,
             Foreground = new SolidColorBrush(Color.FromArgb(160, 255, 255, 255)),
             VerticalAlignment = VerticalAlignment.Center,
             Cursor = Cursors.Hand,
@@ -212,37 +213,43 @@ public sealed class InstalledAppsWindow : Window
         Grid.SetColumn(searchContainer, 1);
         bar.Children.Add(searchContainer);
 
-        // Right: Reliable circular close button
+        // Right: Highly responsive circular close button
         var closeBtn = new Button
         {
-            Width = 28,
-            Height = 28,
+            Width = 30,
+            Height = 30,
             Cursor = Cursors.Hand,
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center,
-            Background = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255)),
+            Background = new SolidColorBrush(Color.FromArgb(24, 255, 255, 255)),
             BorderThickness = new Thickness(0)
         };
         var closeTemplate = new ControlTemplate(typeof(Button));
         var closeBorder = new FrameworkElementFactory(typeof(Border));
         closeBorder.Name = "border";
-        closeBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(14));
+        closeBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(15));
         closeBorder.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(BackgroundProperty));
         var closeText = new FrameworkElementFactory(typeof(TextBlock));
         closeText.SetValue(TextBlock.TextProperty, "✕");
         closeText.SetValue(TextBlock.FontSizeProperty, 12.0);
-        closeText.SetValue(TextBlock.ForegroundProperty, new SolidColorBrush(Color.FromArgb(215, 255, 255, 255)));
+        closeText.SetValue(TextBlock.ForegroundProperty, new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)));
         closeText.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
         closeText.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
         closeBorder.AppendChild(closeText);
         closeTemplate.VisualTree = closeBorder;
 
         var trigger = new Trigger { Property = IsMouseOverProperty, Value = true };
-        trigger.Setters.Add(new Setter(BackgroundProperty, new SolidColorBrush(Color.FromArgb(85, 255, 60, 60))));
+        trigger.Setters.Add(new Setter(BackgroundProperty, new SolidColorBrush(Color.FromArgb(90, 255, 60, 60))));
         closeTemplate.Triggers.Add(trigger);
         closeBtn.Template = closeTemplate;
 
-        closeBtn.PreviewMouseLeftButtonDown += (_, e) => e.Handled = true;
+        // Guaranteed triggers on release or click
+        closeBtn.PreviewMouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            DialogResult = false;
+            Close();
+        };
         closeBtn.Click += (_, e) =>
         {
             e.Handled = true;
@@ -255,11 +262,8 @@ public sealed class InstalledAppsWindow : Window
 
         bar.MouseLeftButtonDown += (_, e) =>
         {
-            if (e.OriginalSource is DependencyObject dep)
-            {
-                if (closeBtn.IsAncestorOf(dep) || dep == closeBtn) return;
-                if (searchContainer.IsAncestorOf(dep) || dep == searchContainer) return;
-            }
+            if (closeBtn.IsMouseOver) return;
+            if (searchContainer.IsMouseOver) return;
             if (e.ButtonState == MouseButtonState.Pressed) DragMove();
         };
 
@@ -309,7 +313,7 @@ public sealed class InstalledAppsWindow : Window
 
     private FrameworkElement BuildBottomBar()
     {
-        var bar = new Grid { Margin = new Thickness(18, 4, 18, 10) };
+        var bar = new Grid { Margin = new Thickness(16, 2, 16, 8) };
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
@@ -422,14 +426,14 @@ public sealed class InstalledAppsWindow : Window
     {
         bool isSelected = _selected.Contains(app);
 
-        // 4 cards per row (165px width + 12px margins = 177px * 4 = 708px, perfectly filling the container without left/right blanks)
+        // 5 cards per row: Width = 128, Margin = 4 (Total 136px * 5 = 680px, perfectly fills 690px width with 5 cards per row)
         var card = new Border
         {
-            Width = 165,
-            Height = 94,
-            CornerRadius = new CornerRadius(13),
-            Margin = new Thickness(6),
-            Padding = new Thickness(8, 6, 8, 6),
+            Width = 128,
+            Height = 76,
+            CornerRadius = new CornerRadius(10),
+            Margin = new Thickness(4),
+            Padding = new Thickness(4, 4, 4, 4),
             Cursor = Cursors.Hand,
             ToolTip = app.Details
         };
@@ -438,19 +442,19 @@ public sealed class InstalledAppsWindow : Window
 
         var grid = new Grid();
 
-        // Top right check badge
+        // Top right check badge (compact, subtle)
         var badge = new Border
         {
-            Width = 16,
-            Height = 16,
-            CornerRadius = new CornerRadius(8),
+            Width = 14,
+            Height = 14,
+            CornerRadius = new CornerRadius(7),
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top
         };
         var checkMark = new TextBlock
         {
             Text = "✓",
-            FontSize = 10.5,
+            FontSize = 9.5,
             FontWeight = FontWeights.Bold,
             Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -469,10 +473,10 @@ public sealed class InstalledAppsWindow : Window
 
         var icon = new Image
         {
-            Source = ShellLinkHelper.GetShellAppIcon(app.ShellPath, dpi, 40),
+            Source = ShellLinkHelper.GetShellAppIcon(app.ShellPath, dpi, 38),
             Width = 36,
             Height = 36,
-            Margin = new Thickness(0, 0, 0, 4),
+            Margin = new Thickness(0, 0, 0, 3),
             HorizontalAlignment = HorizontalAlignment.Center
         };
         RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
@@ -481,14 +485,13 @@ public sealed class InstalledAppsWindow : Window
         var title = new TextBlock
         {
             Text = app.DisplayName,
-            FontSize = 11,
+            FontSize = 10.5,
             Foreground = Brushes.White,
-            TextWrapping = TextWrapping.Wrap,
-            MaxWidth = 148,
-            MaxHeight = 32,
             TextTrimming = TextTrimming.CharacterEllipsis,
             TextAlignment = TextAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Center,
+            MaxWidth = 118,
+            MaxHeight = 20,
             Effect = TextContrast.Shadow
         };
         stack.Children.Add(title);
@@ -502,8 +505,8 @@ public sealed class InstalledAppsWindow : Window
         {
             if (!_selected.Contains(app))
             {
-                card.Background = new SolidColorBrush(Color.FromArgb(32, 255, 255, 255));
-                card.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255));
+                card.Background = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255));
+                card.BorderBrush = new SolidColorBrush(Color.FromArgb(45, 255, 255, 255));
             }
         };
         card.MouseLeave += (_, _) =>
@@ -551,14 +554,15 @@ public sealed class InstalledAppsWindow : Window
     {
         if (selected)
         {
-            card.Background = new SolidColorBrush(Color.FromArgb(40, 0, 229, 255));
+            card.Background = new SolidColorBrush(Color.FromArgb(38, 0, 229, 255));
             card.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#00E5FF"));
-            card.BorderThickness = new Thickness(1.4);
+            card.BorderThickness = new Thickness(1.2);
         }
         else
         {
-            card.Background = new SolidColorBrush(Color.FromArgb(16, 255, 255, 255));
-            card.BorderBrush = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255));
+            // Subtle, light, non-bulky frame
+            card.Background = new SolidColorBrush(Color.FromArgb(8, 255, 255, 255));
+            card.BorderBrush = Brushes.Transparent;
             card.BorderThickness = new Thickness(1);
         }
     }
@@ -573,8 +577,8 @@ public sealed class InstalledAppsWindow : Window
         }
         else
         {
-            badge.Background = new SolidColorBrush(Color.FromArgb(15, 255, 255, 255));
-            badge.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+            badge.Background = new SolidColorBrush(Color.FromArgb(12, 255, 255, 255));
+            badge.BorderBrush = new SolidColorBrush(Color.FromArgb(35, 255, 255, 255));
             badge.BorderThickness = new Thickness(1);
             mark.Visibility = Visibility.Collapsed;
         }
