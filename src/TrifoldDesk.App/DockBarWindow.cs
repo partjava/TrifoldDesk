@@ -94,25 +94,45 @@ public sealed class DockBarWindow : Window
         _pill.CornerRadius = new CornerRadius(24);
         _pill.Padding = new Thickness(10, 5, 10, 5);
         _pill.Background = new LinearGradientBrush(
-            Color.FromArgb(218, 18, 24, 34),
-            Color.FromArgb(235, 10, 14, 20),
+            Color.FromArgb(70, 24, 32, 46),
+            Color.FromArgb(92, 12, 16, 24),
             90);
         _pill.BorderBrush = new LinearGradientBrush(
-            Color.FromArgb(90, 255, 255, 255),
-            Color.FromArgb(28, 255, 255, 255),
-            90);
-        _pill.BorderThickness = new Thickness(1.2);
+            Color.FromArgb(150, 255, 255, 255),
+            Color.FromArgb(35, 255, 255, 255),
+            45);
+        _pill.BorderThickness = new Thickness(1.4);
         _pill.Effect = new DropShadowEffect
         {
-            BlurRadius = 26,
-            ShadowDepth = 5,
+            BlurRadius = 32,
+            ShadowDepth = 6,
             Direction = 270,
-            Opacity = 0.52,
+            Opacity = 0.42,
             Color = Colors.Black
         };
 
         var root = new Grid();
         root.Children.Add(_pill);
+
+        var topShine = new Border
+        {
+            Height = 1.2,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(24, 1, 24, 0),
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new Point(0, 0),
+                EndPoint = new Point(1, 0),
+                GradientStops =
+                [
+                    new(Color.FromArgb(0, 255, 255, 255), 0.0),
+                    new(Color.FromArgb(180, 255, 255, 255), 0.5),
+                    new(Color.FromArgb(0, 255, 255, 255), 1.0)
+                ]
+            },
+            IsHitTestVisible = false
+        };
+        root.Children.Add(topShine);
         Content = root;
 
         var contextMenu = new ContextMenu();
@@ -595,6 +615,13 @@ public sealed class DockBarWindow : Window
     {
         try { _store.Save("dock.json", _config); }
         catch (Exception ex) { App.Log(ex); }
+    }
+
+    public void PinItem(DockItem item)
+    {
+        _config = DockRules.AddItem(_config, item);
+        SaveConfig();
+        Render();
     }
 
     private static DockConfig PopulateInitialDock(ConfigManager store)

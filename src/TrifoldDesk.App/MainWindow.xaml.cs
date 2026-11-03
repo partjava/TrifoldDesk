@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     internal bool AnimationsAllowed => _settings.AnimationsEnabled;
     private readonly HandleWindow _handle;
     private readonly DockBarWindow _dock;
+    private readonly LaunchpadWindow _launchpad;
     private readonly SystemMonitorService _monitor;
     private readonly DiskMonitorService _disks;
     private readonly SystemActionService _actions = new();
@@ -50,6 +51,8 @@ public partial class MainWindow : Window
         _viewModel.RebuildLibrary();
         _handle = new HandleWindow { Topmost = _settings.AlwaysOnTop };
         _dock = new DockBarWindow(_config);
+        _launchpad = new LaunchpadWindow(item => _dock.PinItem(item));
+        _dock.LaunchpadRequested += _launchpad.Toggle;
         _handle.ToggleRequested += () => { if (_collapsed) Reveal(); else SetCollapsed(true); };
         _handle.RevealRequested += Reveal; _handle.SettingsRequested += OpenSettings; _handle.ExitRequested += Exit;
         _hoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
@@ -349,7 +352,7 @@ public partial class MainWindow : Window
         try { _actions.Dispose(); } catch (Exception ex) { App.Log(ex); }
         DesktopHostService.Detach(this);
         _reminders.Dispose();
-        _tray.Dispose(); _handle.Close(); _dock.Close(); Close(); Application.Current.Shutdown();
+        _tray.Dispose(); _handle.Close(); _dock.Close(); _launchpad.Close(); Close(); Application.Current.Shutdown();
     }
     private void WindowClosing(object? sender, CancelEventArgs e) { if (!_closing) { e.Cancel = true; SetCollapsed(true); } }
     internal bool HandleIsVisible => _handle.IsVisible;
