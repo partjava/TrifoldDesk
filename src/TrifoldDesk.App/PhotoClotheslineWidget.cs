@@ -45,6 +45,9 @@ public sealed class PhotoClotheslineWidget : Grid
 {
     private const string DragPhotoFormat = "TrifoldDesk.HangingPhoto";
     private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".bmp", ".webp", ".gif"];
+    private static readonly Queue<(string Hash, DateTime Utc)> RecentHungSignatures = new();
+    private static DateTime _lastAnyHungUtc = DateTime.MinValue;
+
     private readonly string _id;
     private readonly ConfigManager _store;
     private readonly string _style;
@@ -52,8 +55,9 @@ public sealed class PhotoClotheslineWidget : Grid
     private readonly StackPanel _line = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(4, 0, 4, 0), VerticalAlignment = VerticalAlignment.Top };
     private readonly ScrollViewer _scroll = new()
     {
-        HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+        HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
         VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+        CanContentScroll = false,
         Focusable = false,
         Background = Brushes.Transparent,
         Margin = new Thickness(12, 0, 12, 0)
@@ -62,15 +66,13 @@ public sealed class PhotoClotheslineWidget : Grid
     private readonly Border _emptyHint = new() { CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Padding = new Thickness(12, 14, 12, 14), Margin = new Thickness(8, 18, 8, 8), Cursor = Cursors.Hand };
     private readonly Dictionary<string, (RotateTransform Transform, double BaseTilt, double Amplitude, long StartTick)> _swaying = [];
     private readonly DispatcherTimer _swayTimer = new(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(33) };
-    private readonly DispatcherTimer _clipboardWatcherTimer = new() { Interval = TimeSpan.FromMilliseconds(650) };
+    private readonly DispatcherTimer _clipboardWatcherTimer = new() { Interval = TimeSpan.FromMilliseconds(600) };
     private FileSystemWatcher? _watcher;
-    private Point _dragStart;
-    private bool _draggingCard;
-    private Point _panStart;
-    private bool _isPanning;
-    private double _panInitialOffset;
+    private Point _panStartPoint;
+    private double _panStartOffset;
+    private bool _isPanningStage;
+    private bool _hasPanned;
     private uint _lastClipboardSeq;
-    private string _lastHungImageHash = "";
     private Button? _autoBtn;
 
     [DllImport("user32.dll")]
@@ -118,7 +120,7 @@ public sealed class PhotoClotheslineWidget : Grid
 
         _autoBtn = QuickButton(
             _data.AutoWatchScreenshots ? "⚡ 自动上绳: 开" : "⚡ 自动上绳",
-            "自动将剪贴板新截图与系统截图挂到线上",
+            "自动监听新截图或剪贴板图片挂到绳子上",
             darkText,
             _data.AutoWatchScreenshots
         );
@@ -131,12 +133,12 @@ public sealed class PhotoClotheslineWidget : Grid
         pickBtn.Click += (_, _) => ChooseImages();
 
         var prevBtn = QuickButton("‹", "向左滑动挂绳", darkText);
-        prevBtn.Click += (_, _) => _scroll.ScrollToHorizontalOffset(Math.Max(0, _scroll.HorizontalOffset - 140));
+        prevBtn.Click += (_, _) => _scroll.ScrollToHorizontalOffset(Math.Max(0, _scroll.HorizontalOffset - 150));
 
         var nextBtn = QuickButton("›", "向右滑动挂绳", darkText);
-        nextBtn.Click += (_, _) => _scroll.ScrollToHorizontalOffset(_scroll.HorizontalOffset + 140);
+        nextBtn.Click += (_, _) => _scroll.ScrollToHorizontalOffset(_scroll.HorizontalOffset + 150);
 
-        var clearBtn = QuickButton("🧹 清空", "一键摘下绳上所有截图（保留本地原图不删除）", darkText);
+        var clearBtn = QuickButton("🧹 清空", "一键摘下绳上所有截图（保留原图不删除）", darkText);
         clearBtn.Click += (_, _) => ClearAllPhotos();
 
         actions.Children.Add(_autoBtn);
@@ -172,7 +174,7 @@ public sealed class PhotoClotheslineWidget : Grid
         };
         var hintSub = new TextBlock
         {
-            Text = "滚轮直接左右滑动 · 按住 Ctrl+滚轮 缩放大小 · 单击放大",
+            Text = "滚轮左右滑动 · 按住鼠标拖动 · Ctrl+滚轮缩放",
             FontSize = 10,
             Foreground = muted,
             Margin = new Thickness(0, 4, 0, 0),
@@ -188,40 +190,57 @@ public sealed class PhotoClotheslineWidget : Grid
         stage.Children.Add(_emptyHint);
 
         _scroll.Content = _line;
-        _scroll.PreviewMouseWheel += (_, e) =>
+
+        // Stage pan dragging: mouse drag anywhere on the stage slides smoothly
+        _scroll.PreviewMouseLeftButtonDown += (_, e) =>
         {
-            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) return;
-            _scroll.ScrollToHorizontalOffset(_scroll.HorizontalOffset - (e.Delta > 0 ? 110 : -110));
-            e.Handled = true;
-        };
-        _scroll.PreviewMouseDown += (_, e) =>
-        {
-            if (e.LeftButton == MouseButtonState.Pressed && (e.OriginalSource == _scroll || e.OriginalSource == _line))
-            {
-                _panStart = e.GetPosition(_scroll);
-                _panInitialOffset = _scroll.HorizontalOffset;
-                _isPanning = true;
-                _scroll.CaptureMouse();
-            }
+            _panStartPoint = e.GetPosition(_scroll);
+            _panStartOffset = _scroll.HorizontalOffset;
+            _isPanningStage = true;
+            _hasPanned = false;
         };
         _scroll.PreviewMouseMove += (_, e) =>
         {
-            if (_isPanning)
+            if (!_isPanningStage || e.LeftButton != MouseButtonState.Pressed) return;
+            var current = e.GetPosition(_scroll);
+            double dx = current.X - _panStartPoint.X;
+            if (!_hasPanned && Math.Abs(dx) > 4)
             {
-                var cur = e.GetPosition(_scroll);
-                _scroll.ScrollToHorizontalOffset(_panInitialOffset - (cur.X - _panStart.X));
+                _hasPanned = true;
+                _scroll.CaptureMouse();
+            }
+            if (_hasPanned)
+            {
+                _scroll.ScrollToHorizontalOffset(_panStartOffset - dx);
+                e.Handled = true;
             }
         };
-        _scroll.PreviewMouseUp += (_, e) =>
+        _scroll.PreviewMouseLeftButtonUp += (_, e) =>
         {
-            if (_isPanning)
+            if (_isPanningStage)
             {
-                _isPanning = false;
-                _scroll.ReleaseMouseCapture();
+                _isPanningStage = false;
+                if (_hasPanned)
+                {
+                    _scroll.ReleaseMouseCapture();
+                    e.Handled = true;
+                }
             }
         };
+
         stage.Children.Add(_scroll);
         Children.Add(stage);
+
+        // Entire widget wheel scrolls the clothesline horizontally
+        PreviewMouseWheel += (_, e) =>
+        {
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) return;
+            if (_scroll.ScrollableWidth > 0)
+            {
+                _scroll.ScrollToHorizontalOffset(_scroll.HorizontalOffset - (e.Delta > 0 ? 110 : -110));
+                e.Handled = true;
+            }
+        };
 
         var menu = new ContextMenu();
         var menuPaste = new MenuItem { Header = "挂起剪贴板截图 (Ctrl+V)" };
@@ -377,6 +396,25 @@ public sealed class PhotoClotheslineWidget : Grid
         }
     }
 
+    private static bool IsDuplicateAutoScreenshot(BitmapSource bmp)
+    {
+        var now = DateTime.UtcNow;
+        if ((now - _lastAnyHungUtc).TotalMilliseconds < 1200)
+            return true;
+
+        string hash = ComputeImageSignature(bmp);
+        var cutoff = now.AddSeconds(-6);
+        while (RecentHungSignatures.Count > 0 && RecentHungSignatures.Peek().Utc < cutoff)
+            RecentHungSignatures.Dequeue();
+
+        if (RecentHungSignatures.Any(r => r.Hash == hash))
+            return true;
+
+        RecentHungSignatures.Enqueue((hash, now));
+        _lastAnyHungUtc = now;
+        return false;
+    }
+
     private void ClipboardWatcherTick(object? sender, EventArgs e)
     {
         if (!_data.AutoWatchScreenshots) return;
@@ -387,12 +425,8 @@ public sealed class PhotoClotheslineWidget : Grid
             _lastClipboardSeq = seq;
             if (Clipboard.ContainsImage() && Clipboard.GetImage() is BitmapSource bmp)
             {
-                string hash = ComputeImageSignature(bmp);
-                if (hash != _lastHungImageHash)
-                {
-                    _lastHungImageHash = hash;
-                    HangBitmap(bmp, DateTime.Now.ToString("HH:mm 自动截图"));
-                }
+                if (IsDuplicateAutoScreenshot(bmp)) return;
+                HangBitmap(bmp, DateTime.Now.ToString("HH:mm 自动截图"), isAuto: true);
             }
         }
         catch { }
@@ -400,25 +434,30 @@ public sealed class PhotoClotheslineWidget : Grid
 
     private static string ComputeImageSignature(BitmapSource bmp)
     {
-        int w = bmp.PixelWidth, h = bmp.PixelHeight;
         try
         {
-            var cb = new CroppedBitmap(bmp, new Int32Rect(0, 0, Math.Min(16, w), Math.Min(16, h)));
-            int stride = cb.PixelWidth * 4;
-            byte[] pixels = new byte[stride * cb.PixelHeight];
-            cb.CopyPixels(pixels, stride, 0);
+            int w = bmp.PixelWidth, h = bmp.PixelHeight;
+            var formatted = new FormatConvertedBitmap(bmp, PixelFormats.Bgra32, null, 0);
+            int sampleW = Math.Min(32, w);
+            int sampleH = Math.Min(32, h);
+            var cropped = new CroppedBitmap(formatted, new Int32Rect(0, 0, sampleW, sampleH));
+            int stride = sampleW * 4;
+            byte[] pixels = new byte[stride * sampleH];
+            cropped.CopyPixels(pixels, stride, 0);
             using var md5 = MD5.Create();
             return $"{w}x{h}_" + Convert.ToHexString(md5.ComputeHash(pixels));
         }
         catch
         {
-            return $"{w}x{h}_{Environment.TickCount64}";
+            return $"{bmp.PixelWidth}x{bmp.PixelHeight}";
         }
     }
 
-    public bool HangBitmap(BitmapSource bitmap, string? title = null)
+    public bool HangBitmap(BitmapSource bitmap, string? title = null, bool isAuto = false)
     {
         ArgumentNullException.ThrowIfNull(bitmap);
+        if (isAuto && IsDuplicateAutoScreenshot(bitmap)) return false;
+
         string itemId = Guid.NewGuid().ToString("N");
         string file = Path.Combine(ScreenshotsStoreDir(), itemId + ".png");
         var encoder = new PngBitmapEncoder();
@@ -437,7 +476,7 @@ public sealed class PhotoClotheslineWidget : Grid
         {
             if (Clipboard.ContainsImage() && Clipboard.GetImage() is BitmapSource image)
             {
-                _lastHungImageHash = ComputeImageSignature(image);
+                _lastAnyHungUtc = DateTime.UtcNow;
                 HangBitmap(image, DateTime.Now.ToString("HH:mm 剪贴板截图"));
                 return;
             }
@@ -471,7 +510,7 @@ public sealed class PhotoClotheslineWidget : Grid
             HangFiles(dialog.FileNames);
     }
 
-    public void HangFiles(IEnumerable<string> paths)
+    public void HangFiles(IEnumerable<string> paths, bool isAuto = false)
     {
         string? newestId = null;
         var next = PhotoLineRules.Clone(_data);
@@ -482,6 +521,13 @@ public sealed class PhotoClotheslineWidget : Grid
                 if (string.IsNullOrWhiteSpace(source) || !File.Exists(source)) continue;
                 string ext = Path.GetExtension(source);
                 if (!ImageExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase)) continue;
+
+                if (isAuto)
+                {
+                    var bmp = LoadBitmap(source);
+                    if (bmp != null && IsDuplicateAutoScreenshot(bmp)) continue;
+                }
+
                 string id = Guid.NewGuid().ToString("N");
                 string dest = Path.Combine(ScreenshotsStoreDir(), id + ext.ToLowerInvariant());
                 File.Copy(source, dest, true);
@@ -555,8 +601,12 @@ public sealed class PhotoClotheslineWidget : Grid
                 if (!ImageExtensions.Contains(Path.GetExtension(e.FullPath), StringComparer.OrdinalIgnoreCase)) return;
                 _ = Task.Run(async () =>
                 {
-                    await Task.Delay(450);
-                    _ = Dispatcher.BeginInvoke(() => { if (IsLoaded) HangFiles([e.FullPath]); });
+                    await Task.Delay(400);
+                    _ = Dispatcher.BeginInvoke(() =>
+                    {
+                        if (IsLoaded && _data.AutoWatchScreenshots)
+                            HangFiles([e.FullPath], isAuto: true);
+                    });
                 });
             };
         }
@@ -580,16 +630,17 @@ public sealed class PhotoClotheslineWidget : Grid
         _emptyHint.Visibility = _data.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         _status.Text = _data.Items.Count == 0 ? "挂绳空置中" : $"已挂 {_data.Items.Count} 张截图 · 滚轮左右滑";
 
-        foreach (var item in _data.Items)
+        for (int i = 0; i < _data.Items.Count; i++)
         {
-            var card = BuildPhotoCard(item, out var rotate);
+            var item = _data.Items[i];
+            var card = BuildPhotoCard(item, i, out var rotate);
             _line.Children.Add(card);
             if (item.Id == newlyHungId)
                 TriggerSway(item.Id, rotate, item.TiltDegrees, 5.5);
         }
     }
 
-    private FrameworkElement BuildPhotoCard(HangingPhotoItem item, out RotateTransform rotate)
+    private FrameworkElement BuildPhotoCard(HangingPhotoItem item, int index, out RotateTransform rotate)
     {
         rotate = new RotateTransform(item.TiltDegrees);
         var transformRef = rotate;
@@ -608,8 +659,7 @@ public sealed class PhotoClotheslineWidget : Grid
             RenderTransformOrigin = new Point(0.5, 0.05),
             RenderTransform = rotate,
             Cursor = Cursors.Hand,
-            AllowDrop = true,
-            ToolTip = $"{item.Title}\n单击：置顶放大参考\nCtrl+滚轮：缩放卡片大小 ({(int)(scale * 100)}%)\n左右拖动：调换顺序\n右键：更多操作"
+            ToolTip = $"{item.Title}\n单击：置顶放大参考\n滚轮：左右滑动挂绳\nCtrl+滚轮：缩放大小 ({(int)(scale * 100)}%)\n右键：更多操作"
         };
 
         bool darkText = TextContrast.IsDarkTextStyle(_style);
@@ -717,37 +767,18 @@ public sealed class PhotoClotheslineWidget : Grid
             }
         };
 
+        Point cardPressPoint = default;
         container.PreviewMouseLeftButtonDown += (_, e) =>
         {
-            _dragStart = e.GetPosition(container);
-            _draggingCard = false;
-        };
-        container.PreviewMouseMove += (_, e) =>
-        {
-            if (e.LeftButton != MouseButtonState.Pressed || _draggingCard) return;
-            var pos = e.GetPosition(container);
-            if (Math.Abs(pos.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
-                Math.Abs(pos.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
-            _draggingCard = true;
-            var data = new DataObject();
-            data.SetData(DragPhotoFormat, item.Id);
-            if (File.Exists(item.ImagePath))
-                data.SetData(DataFormats.FileDrop, new[] { Path.GetFullPath(item.ImagePath) });
-            DragDrop.DoDragDrop(container, data, DragDropEffects.Move | DragDropEffects.Copy);
-            e.Handled = true;
+            cardPressPoint = e.GetPosition(this);
         };
         container.MouseLeftButtonUp += (_, e) =>
         {
-            if (_draggingCard) { _draggingCard = false; return; }
-            OpenViewer(item, false);
-            e.Handled = true;
-        };
-        container.Drop += (_, e) =>
-        {
-            if (e.Data.GetData(DragPhotoFormat) is string sourceId && sourceId != item.Id)
+            if (_hasPanned) return;
+            var upPoint = e.GetPosition(this);
+            if (Math.Abs(upPoint.X - cardPressPoint.X) < 6 && Math.Abs(upPoint.Y - cardPressPoint.Y) < 6)
             {
-                var next = PhotoLineRules.MovePhoto(_data, sourceId, item.Id);
-                if (Save(next)) Render(sourceId);
+                OpenViewer(item, false);
                 e.Handled = true;
             }
         };
@@ -761,6 +792,25 @@ public sealed class PhotoClotheslineWidget : Grid
         copyItem.Click += (_, _) => CopyPhotoToClipboard(item);
         var renameItem = new MenuItem { Header = "修改备注文字…" };
         renameItem.Click += (_, _) => RenamePhoto(item);
+
+        var moveLeft = new MenuItem { Header = "向左移一位", IsEnabled = index > 0 };
+        moveLeft.Click += (_, _) =>
+        {
+            if (index > 0)
+            {
+                var next = PhotoLineRules.MovePhoto(_data, item.Id, _data.Items[index - 1].Id);
+                if (Save(next)) Render(item.Id);
+            }
+        };
+        var moveRight = new MenuItem { Header = "向右移一位", IsEnabled = index < _data.Items.Count - 1 };
+        moveRight.Click += (_, _) =>
+        {
+            if (index < _data.Items.Count - 1)
+            {
+                var next = PhotoLineRules.MovePhoto(_data, item.Id, _data.Items[index + 1].Id);
+                if (Save(next)) Render(item.Id);
+            }
+        };
 
         var zoomIn = new MenuItem { Header = "放大卡片 (Ctrl+滚轮上)" };
         zoomIn.Click += (_, _) =>
@@ -790,7 +840,7 @@ public sealed class PhotoClotheslineWidget : Grid
             if (File.Exists(item.ImagePath))
                 Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{Path.GetFullPath(item.ImagePath)}\"") { UseShellExecute = true });
         };
-        var removeItem = new MenuItem { Header = "从绳上取下（保留文件）" };
+        var removeItem = new MenuItem { Header = "从绳上取下（保留原图）" };
         removeItem.Click += (_, _) => RemovePhoto(item.Id);
 
         cardMenu.Items.Add(viewItem);
@@ -798,6 +848,8 @@ public sealed class PhotoClotheslineWidget : Grid
         cardMenu.Items.Add(copyItem);
         cardMenu.Items.Add(renameItem);
         cardMenu.Items.Add(new Separator());
+        cardMenu.Items.Add(moveLeft);
+        cardMenu.Items.Add(moveRight);
         cardMenu.Items.Add(zoomIn);
         cardMenu.Items.Add(zoomOut);
         cardMenu.Items.Add(zoomReset);
