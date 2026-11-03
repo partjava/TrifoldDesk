@@ -1,4 +1,5 @@
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
@@ -8,7 +9,12 @@ namespace TrifoldDesk;
 
 public sealed class InstalledAppsWindow : Window
 {
-    private readonly WrapPanel _apps = new() { Margin = new Thickness(0), HorizontalAlignment = HorizontalAlignment.Center };
+    private readonly UniformGrid _apps = new()
+    {
+        Columns = 5,
+        Margin = new Thickness(4, 2, 4, 4),
+        HorizontalAlignment = HorizontalAlignment.Stretch
+    };
     private readonly HashSet<InstalledApp> _selected = [];
     private readonly IReadOnlyList<InstalledApp> _catalog;
     private readonly Dictionary<InstalledApp, (Border Card, Border CheckBadge, TextBlock CheckMark)> _cardMap = [];
@@ -52,18 +58,24 @@ public sealed class InstalledAppsWindow : Window
 
         KeyDown += (_, e) =>
         {
-            if (e.Key == Key.Escape) { DialogResult = false; Close(); }
+            if (e.Key == Key.Escape) { CloseDialog(); }
         };
+    }
+
+    private void CloseDialog()
+    {
+        try { DialogResult = false; } catch { /* ignore if non-modal */ }
+        Close();
     }
 
     private void BuildUI()
     {
-        // Translucent frosted glass container (light, airy, non-black)
+        // Translucent frosted acrylic glass frame (airy, modern, no heavy dark block)
         var glass = new Border
         {
             CornerRadius = new CornerRadius(22),
             Background = new LinearGradientBrush(
-                Color.FromArgb(80, 20, 26, 36),
+                Color.FromArgb(85, 20, 28, 40),
                 Color.FromArgb(115, 12, 16, 24),
                 90),
             BorderBrush = new LinearGradientBrush(
@@ -83,8 +95,8 @@ public sealed class InstalledAppsWindow : Window
         };
 
         var mainGrid = new Grid();
-        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(42) }); // Compact Header
-        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // 5-column App Grid
+        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(38) }); // Tight header
+        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // 5-column Edge-to-Edge Grid
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(46) }); // Compact Action Bar
 
         var shine = new Border
@@ -113,13 +125,13 @@ public sealed class InstalledAppsWindow : Window
         Grid.SetRow(header, 0);
         mainGrid.Children.Add(header);
 
-        // Row 1: App Cards with ultra-slim transparent scrollbar (5 columns, zero left/right wasted space)
+        // Row 1: App Cards in a strict 5-Column UniformGrid spanning 100% width with slim transparent scrollbar
         var scrollViewer = new ScrollViewer
         {
             Content = _apps,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            Margin = new Thickness(12, 0, 12, 0)
+            Margin = new Thickness(8, 0, 8, 0)
         };
         ApplySlimScrollBarStyle(scrollViewer);
         Grid.SetRow(scrollViewer, 1);
@@ -144,7 +156,7 @@ public sealed class InstalledAppsWindow : Window
 
     private FrameworkElement BuildHeader()
     {
-        var bar = new Grid { Background = Brushes.Transparent, Margin = new Thickness(14, 6, 14, 2) };
+        var bar = new Grid { Background = Brushes.Transparent, Margin = new Thickness(12, 5, 12, 1) };
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
@@ -153,8 +165,8 @@ public sealed class InstalledAppsWindow : Window
         var searchContainer = new Border
         {
             Width = 320,
-            Height = 30,
-            CornerRadius = new CornerRadius(15),
+            Height = 28,
+            CornerRadius = new CornerRadius(14),
             Background = new SolidColorBrush(Color.FromArgb(32, 255, 255, 255)),
             BorderBrush = new SolidColorBrush(Color.FromArgb(55, 255, 255, 255)),
             BorderThickness = new Thickness(1),
@@ -169,7 +181,7 @@ public sealed class InstalledAppsWindow : Window
         var searchIcon = new TextBlock
         {
             Text = "🔍",
-            FontSize = 11.5,
+            FontSize = 11,
             Foreground = new SolidColorBrush(Color.FromArgb(160, 255, 255, 255)),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 6, 0)
@@ -182,7 +194,7 @@ public sealed class InstalledAppsWindow : Window
         _searchBox.BorderThickness = new Thickness(0);
         _searchBox.Foreground = Brushes.White;
         _searchBox.CaretBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#00E5FF"));
-        _searchBox.FontSize = 12.5;
+        _searchBox.FontSize = 12;
         _searchBox.VerticalAlignment = VerticalAlignment.Center;
         _searchBox.Padding = new Thickness(0);
 
@@ -213,48 +225,41 @@ public sealed class InstalledAppsWindow : Window
         Grid.SetColumn(searchContainer, 1);
         bar.Children.Add(searchContainer);
 
-        // Right: Highly responsive circular close button
-        var closeBtn = new Button
+        // Right: Highly responsive, instant-trigger circular close button
+        var closeBtn = new Border
         {
-            Width = 30,
-            Height = 30,
+            Width = 28,
+            Height = 28,
+            CornerRadius = new CornerRadius(14),
+            Background = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255)),
             Cursor = Cursors.Hand,
             HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var closeText = new TextBlock
+        {
+            Text = "✕",
+            FontSize = 12.0,
+            Foreground = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)),
+            HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            Background = new SolidColorBrush(Color.FromArgb(24, 255, 255, 255)),
-            BorderThickness = new Thickness(0)
+            IsHitTestVisible = false
         };
-        var closeTemplate = new ControlTemplate(typeof(Button));
-        var closeBorder = new FrameworkElementFactory(typeof(Border));
-        closeBorder.Name = "border";
-        closeBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(15));
-        closeBorder.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(BackgroundProperty));
-        var closeText = new FrameworkElementFactory(typeof(TextBlock));
-        closeText.SetValue(TextBlock.TextProperty, "✕");
-        closeText.SetValue(TextBlock.FontSizeProperty, 12.0);
-        closeText.SetValue(TextBlock.ForegroundProperty, new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)));
-        closeText.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-        closeText.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
-        closeBorder.AppendChild(closeText);
-        closeTemplate.VisualTree = closeBorder;
+        closeBtn.Child = closeText;
 
-        var trigger = new Trigger { Property = IsMouseOverProperty, Value = true };
-        trigger.Setters.Add(new Setter(BackgroundProperty, new SolidColorBrush(Color.FromArgb(90, 255, 60, 60))));
-        closeTemplate.Triggers.Add(trigger);
-        closeBtn.Template = closeTemplate;
+        closeBtn.MouseEnter += (_, _) => closeBtn.Background = new SolidColorBrush(Color.FromArgb(90, 255, 60, 60));
+        closeBtn.MouseLeave += (_, _) => closeBtn.Background = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255));
 
-        // Guaranteed triggers on release or click
-        closeBtn.PreviewMouseLeftButtonUp += (_, e) =>
+        // Guaranteed trigger on MouseDown: closes window IMMEDIATELY on touch without waiting for MouseUp or battling DragMove
+        closeBtn.PreviewMouseLeftButtonDown += (_, e) =>
         {
             e.Handled = true;
-            DialogResult = false;
-            Close();
+            CloseDialog();
         };
-        closeBtn.Click += (_, e) =>
+        closeBtn.MouseLeftButtonUp += (_, e) =>
         {
             e.Handled = true;
-            DialogResult = false;
-            Close();
+            CloseDialog();
         };
 
         Grid.SetColumn(closeBtn, 2);
@@ -358,7 +363,7 @@ public sealed class InstalledAppsWindow : Window
         };
         var cancelText = new TextBlock { Text = "取消", FontSize = 12, Foreground = Brushes.White };
         cancelBtn.Child = cancelText;
-        cancelBtn.MouseLeftButtonUp += (_, _) => { DialogResult = false; Close(); };
+        cancelBtn.MouseLeftButtonUp += (_, _) => CloseDialog();
         rightStack.Children.Add(cancelBtn);
 
         _addBtn.Content = "添加至 Dock";
@@ -426,14 +431,13 @@ public sealed class InstalledAppsWindow : Window
     {
         bool isSelected = _selected.Contains(app);
 
-        // 5 cards per row: Width = 128, Margin = 4 (Total 136px * 5 = 680px, perfectly fills 690px width with 5 cards per row)
+        // Cell in 5-Column UniformGrid: automatically spans width edge-to-edge with no empty borders
         var card = new Border
         {
-            Width = 128,
-            Height = 76,
+            Height = 74,
             CornerRadius = new CornerRadius(10),
-            Margin = new Thickness(4),
-            Padding = new Thickness(4, 4, 4, 4),
+            Margin = new Thickness(3, 3, 3, 3),
+            Padding = new Thickness(3, 4, 3, 4),
             Cursor = Cursors.Hand,
             ToolTip = app.Details
         };
@@ -476,7 +480,7 @@ public sealed class InstalledAppsWindow : Window
             Source = ShellLinkHelper.GetShellAppIcon(app.ShellPath, dpi, 38),
             Width = 36,
             Height = 36,
-            Margin = new Thickness(0, 0, 0, 3),
+            Margin = new Thickness(0, 0, 0, 2),
             HorizontalAlignment = HorizontalAlignment.Center
         };
         RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
@@ -490,8 +494,8 @@ public sealed class InstalledAppsWindow : Window
             TextTrimming = TextTrimming.CharacterEllipsis,
             TextAlignment = TextAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Center,
-            MaxWidth = 118,
-            MaxHeight = 20,
+            MaxWidth = 120,
+            MaxHeight = 18,
             Effect = TextContrast.Shadow
         };
         stack.Children.Add(title);
