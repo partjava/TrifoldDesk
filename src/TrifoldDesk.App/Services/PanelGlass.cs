@@ -35,44 +35,75 @@ internal static class PanelGlass
     public static void AttachWidget(Border surface)
     {
         var fallback = surface.Background;
+        var layoutDelay = TimeSpan.FromMilliseconds(180);
+        var frameDelay = TimeSpan.FromMilliseconds(750);
+        var retryDelay = TimeSpan.FromSeconds(3);
         Drawing.Rectangle requested = Drawing.Rectangle.Empty;
-        var refresh = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
+        var refresh = new DispatcherTimer(DispatcherPriority.Background);
         bool rendering = false;
+        int revision = 0;
+
+        void QueueRefresh(TimeSpan delay)
+        {
+            refresh.Stop();
+            refresh.Interval = delay;
+            refresh.Start();
+        }
+
+        void Reset()
+        {
+            refresh.Stop();
+            requested = Drawing.Rectangle.Empty;
+            revision++;
+        }
 
         void Schedule()
         {
-            if (!surface.IsVisible || PresentationSource.FromVisual(surface) is null) return;
+            if (!surface.IsLoaded || !surface.IsVisible || PresentationSource.FromVisual(surface) is null) return;
             var bounds = ScreenBounds(surface);
             if (bounds == requested) return;
             requested = bounds;
-            refresh.Stop();
-            if (!rendering) refresh.Start();
+            revision++;
+            if (bounds.Width <= 0 || bounds.Height <= 0) refresh.Stop();
+            else if (!rendering) QueueRefresh(layoutDelay);
         }
 
         refresh.Tick += async (_, _) =>
         {
             refresh.Stop();
-            if (!surface.IsVisible || Window.GetWindow(surface) is not Window window) return;
+            if (!surface.IsLoaded || !surface.IsVisible || Window.GetWindow(surface) is not Window window) return;
+            if (window.WindowState == WindowState.Minimized)
+            {
+                QueueRefresh(retryDelay);
+                return;
+            }
             var bounds = requested;
             var hwnd = new WindowInteropHelper(window).Handle;
-            if (hwnd == 0) return;
+            if (hwnd == 0)
+            {
+                QueueRefresh(retryDelay);
+                return;
+            }
             double scale = VisualTreeHelper.GetDpi(surface).DpiScaleX;
+            int capturedRevision = revision;
+            BitmapSource? frame = null;
             rendering = true;
             try
             {
-                var frame = await CaptureAsync(hwnd, bounds, surface.CornerRadius.TopLeft, scale, lighterPanel: true);
-                if (surface.IsVisible && bounds == requested)
+                frame = await CaptureAsync(hwnd, bounds, surface.CornerRadius.TopLeft, scale, lighterPanel: true);
+                if (surface.IsLoaded && surface.IsVisible && capturedRevision == revision)
                     surface.Background = frame is null ? fallback : new ImageBrush(frame) { Stretch = Stretch.Fill };
             }
             finally
             {
                 rendering = false;
-                if (surface.IsVisible && bounds != requested) refresh.Start();
+                if (surface.IsLoaded && surface.IsVisible && requested.Width > 0 && requested.Height > 0)
+                    QueueRefresh(capturedRevision != revision ? layoutDelay : frame is null ? retryDelay : frameDelay);
             }
         };
-        surface.Loaded += (_, _) => { requested = Drawing.Rectangle.Empty; Schedule(); };
+        surface.Loaded += (_, _) => { Reset(); Schedule(); };
         surface.LayoutUpdated += (_, _) => Schedule();
-        surface.IsVisibleChanged += (_, _) => { requested = Drawing.Rectangle.Empty; Schedule(); };
-        surface.Unloaded += (_, _) => refresh.Stop();
+        surface.IsVisibleChanged += (_, _) => { Reset(); Schedule(); };
+        surface.Unloaded += (_, _) => Reset();
     }
 }

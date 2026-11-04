@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
@@ -124,6 +125,14 @@ public sealed class LaunchpadWindow : Window
         root.Children.Add(_backdrop);
         root.Children.Add(_glass);
         Content = root;
+        WindowGlassRefresh.Attach(this, _backdrop, _glass, ApplyGlassFrame);
+    }
+
+    private void ApplyGlassFrame(BitmapSource? frame)
+    {
+        _backdrop.Background = frame is null ? null : new ImageBrush(frame);
+        _glass.Background = frame is null ? LaunchpadFallbackTint : Brushes.Transparent;
+        _glass.BorderBrush = frame is null ? LaunchpadFallbackRim : Brushes.Transparent;
     }
 
     private static Brush ControlGlassFill { get; } = new LinearGradientBrush(
@@ -332,10 +341,8 @@ public sealed class LaunchpadWindow : Window
     {
         _isOpen = true;
         int revision = ++_revealRevision;
-        _backdrop.Background = null;
+        ApplyGlassFrame(null);
         _glass.OpacityMask = null;
-        _glass.BorderBrush = LaunchpadFallbackRim;
-        _glass.Background = LaunchpadFallbackTint;
         BeginAnimation(OpacityProperty, null);
         Opacity = 0;
         Show();
@@ -346,32 +353,11 @@ public sealed class LaunchpadWindow : Window
         await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
         if (!_isOpen || revision != _revealRevision) return;
 
-        var start = _backdrop.PointToScreen(new Point());
-        var end = _backdrop.PointToScreen(new Point(_backdrop.ActualWidth, _backdrop.ActualHeight));
-        var area = System.Drawing.Rectangle.FromLTRB((int)Math.Round(start.X), (int)Math.Round(start.Y),
-            (int)Math.Round(end.X), (int)Math.Round(end.Y));
-        if (area.Width > 0 && area.Height > 0)
-        {
-            double scale = VisualTreeHelper.GetDpi(_backdrop).DpiScaleX;
-            double radius = _glass.CornerRadius.TopLeft * scale;
-            try
-            {
-                var frame = await Task.Run(() => DockGlassRenderer.Render(0, area, radius, scale,
-                    launchpad: true));
-                if (_isOpen && revision == _revealRevision && frame is not null)
-                {
-                    _backdrop.Background = new ImageBrush(frame);
-                    _glass.Background = Brushes.Transparent;
-                    _glass.BorderBrush = Brushes.Transparent;
-                }
-            }
-            catch (Exception error) when (error is System.ComponentModel.Win32Exception
-                or System.Runtime.InteropServices.ExternalException or ArgumentException or OutOfMemoryException)
-            {
-                System.Diagnostics.Debug.WriteLine(error);
-            }
-        }
+        var frame = await PanelGlass.CaptureAsync(new WindowInteropHelper(this).Handle,
+            PanelGlass.ScreenBounds(_backdrop), _glass.CornerRadius.TopLeft,
+            VisualTreeHelper.GetDpi(_backdrop).DpiScaleX);
         if (!_isOpen || revision != _revealRevision) return;
+        ApplyGlassFrame(frame);
 
         var anim = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(160))
         {
@@ -380,6 +366,7 @@ public sealed class LaunchpadWindow : Window
         };
         anim.Completed += (_, _) =>
         {
+            if (revision != _revealRevision) return;
             BeginAnimation(OpacityProperty, null);
             Opacity = 1.0;
         };
@@ -390,7 +377,7 @@ public sealed class LaunchpadWindow : Window
     {
         if (!_isOpen) return;
         _isOpen = false;
-        ++_revealRevision;
+        int revision = ++_revealRevision;
 
         var anim = new DoubleAnimation(0.0, TimeSpan.FromMilliseconds(120))
         {
@@ -399,6 +386,7 @@ public sealed class LaunchpadWindow : Window
         };
         anim.Completed += (_, _) =>
         {
+            if (revision != _revealRevision) return;
             BeginAnimation(OpacityProperty, null);
             Opacity = 0;
             Hide();

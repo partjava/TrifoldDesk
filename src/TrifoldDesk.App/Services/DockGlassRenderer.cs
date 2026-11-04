@@ -13,9 +13,21 @@ internal static class DockGlassRenderer
 {
     private static readonly object CaptureGate = new();
     private const uint ExcludeFromCapture = 0x11;
+    private const uint PreviousWindow = 3;
+    private static readonly uint ProcessId = (uint)Environment.ProcessId;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left, Top, Right, Bottom;
+    }
 
     [DllImport("user32.dll")] private static extern bool SetWindowDisplayAffinity(nint window, uint affinity);
     [DllImport("user32.dll")] private static extern bool GetWindowDisplayAffinity(nint window, out uint affinity);
+    [DllImport("user32.dll")] private static extern nint GetWindow(nint window, uint command);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint window);
+    [DllImport("user32.dll")] private static extern bool GetWindowRect(nint window, out NativeRect rect);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint window, out uint processId);
     [DllImport("dwmapi.dll")] private static extern int DwmFlush();
     [DllImport("user32.dll")] private static extern nint GetDC(nint window);
     [DllImport("user32.dll")] private static extern int ReleaseDC(nint window, nint dc);
@@ -110,19 +122,40 @@ internal static class DockGlassRenderer
     }
     private static bool CaptureDesktop(nint window, Drawing.Bitmap bitmap, Drawing.Rectangle capture, Drawing.Rectangle visible)
     {
-        uint previous = 0;
-        if (window != 0 && (!GetWindowDisplayAffinity(window, out previous) ||
-            !SetWindowDisplayAffinity(window, ExcludeFromCapture)))
-            return false;
+        if (window == 0) return false;
+        var exclusions = new List<(nint Window, uint Affinity)>();
+
+        bool Exclude(nint hwnd)
+        {
+            if (!GetWindowDisplayAffinity(hwnd, out uint previous)) return false;
+            if (previous == ExcludeFromCapture) return true;
+            if (!SetWindowDisplayAffinity(hwnd, ExcludeFromCapture)) return false;
+            exclusions.Add((hwnd, previous));
+            return true;
+        }
+
         try
         {
-            return DwmFlush() >= 0 && (window == 0 ||
-                (GetWindowDisplayAffinity(window, out uint current) && current == ExcludeFromCapture))
-                && CopyDesktop(bitmap, capture, visible);
+            if (!Exclude(window)) return false;
+
+            // A foreground TrifoldDesk window cannot be part of the glass behind it.
+            // Including it would feed that glass back into its own next frame.
+            var visited = new HashSet<nint> { window };
+            for (nint above = GetWindow(window, PreviousWindow); above != 0 && visited.Add(above);
+                above = GetWindow(above, PreviousWindow))
+            {
+                if (!IsWindowVisible(above) || GetWindowThreadProcessId(above, out uint owner) == 0 ||
+                    owner != ProcessId || !GetWindowRect(above, out var rect)) continue;
+                var bounds = Drawing.Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
+                if (bounds.IntersectsWith(visible)) Exclude(above);
+            }
+
+            return DwmFlush() >= 0 && CopyDesktop(bitmap, capture, visible);
         }
         finally
         {
-            if (window != 0) SetWindowDisplayAffinity(window, previous);
+            for (int i = exclusions.Count - 1; i >= 0; i--)
+                SetWindowDisplayAffinity(exclusions[i].Window, exclusions[i].Affinity);
         }
     }
 

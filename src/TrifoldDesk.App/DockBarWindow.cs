@@ -831,6 +831,7 @@ public sealed class DockBarWindow : Window
     {
         _glassRevision++;
         _glassTimer.Stop();
+        _glassTimer.Interval = TimeSpan.FromMilliseconds(250);
         if (!_glassClosed && IsVisible && !_isSlidDown)
             _glassTimer.Start();
     }
@@ -873,9 +874,12 @@ public sealed class DockBarWindow : Window
         finally
         {
             _glassRendering = false;
-            if (!_glassClosed && IsVisible && !_isSlidDown &&
-                (revision != _glassRevision || _glass.Background is ImageBrush))
+            if (!_glassClosed && IsVisible && !_isSlidDown)
+            {
+                _glassTimer.Interval = TimeSpan.FromMilliseconds(
+                    revision == _glassRevision && _glass.Background is not ImageBrush ? 1000 : 250);
                 _glassTimer.Start();
+            }
         }
     }
 

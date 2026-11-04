@@ -23,7 +23,7 @@ Windows 桌面整理工具：用左、中、右三个可独立折叠的页面，
 操作集中在右键菜单，桌面仅保留内容与必要的控件。
 
 - **程序坞与应用启动台**：固定应用、拖拽排序、悬停放大、自动隐藏；启动台支持分类浏览、搜索和分页。
-- **液态玻璃**：启动台、添加应用窗口、程序坞和非文件夹桌面组件对屏幕背景做轻度模糊和边缘折射。无法采集时使用半透明背景。
+- **液态玻璃**：启动台、添加应用窗口、程序坞和非文件夹桌面组件在显示期间定期采样屏幕背景，更新模糊和边缘折射。无法采集时使用半透明背景。
 
 
 ## 下载运行
@@ -32,18 +32,18 @@ Windows 桌面整理工具：用左、中、右三个可独立折叠的页面，
 
 ## 从源码构建
 
-当前源码版本为 **0.10.18**。适用于 Windows 10 2004（19041）及更新版本、Windows 11 x64。公开安装包以发布页为准。
+当前源码版本为 **0.10.19**。适用于 Windows 10 2004（19041）及更新版本、Windows 11 x64。公开安装包以发布页为准。
 
 安装 .NET 8 SDK，或具备 .NET 8 目标框架支持的更新 SDK，然后在项目根目录打开 PowerShell：
 
 ```powershell
 git clone https://github.com/partjava/TrifoldDesk.git
 cd TrifoldDesk
-.\Build.ps1 -Test -Version '0.10.18'
+.\Build.ps1 -Test -Version '0.10.19'
 .\启动三折桌面.bat
 ```
 
-构建结果位于 `dist/v0.10.18/`。运行需要 **.NET 8 Windows Desktop Runtime x64**，请保留整个发布目录，不能只复制 EXE。首次构建需联网恢复Windows SDK和LibreHardwareMonitor依赖。
+构建结果位于 `dist/v0.10.19/`，内置 .NET 运行环境。请保留整个发布目录，不能只复制 EXE。首次构建需联网恢复 Windows SDK 和 LibreHardwareMonitor 依赖。
 
 ## 使用
 

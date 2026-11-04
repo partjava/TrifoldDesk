@@ -1,6 +1,7 @@
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using System.Windows.Media.Imaging;
 using TrifoldDesk.Services;
@@ -121,19 +122,24 @@ public sealed class InstalledAppsWindow : Window
         root.Children.Add(backdrop);
         root.Children.Add(glass);
         Content = root;
+        var fallbackFill = glass.Background;
+        var fallbackRim = glass.BorderBrush;
+        void ApplyGlassFrame(BitmapSource? frame)
+        {
+            backdrop.Background = frame is null ? null : new ImageBrush(frame);
+            glass.Background = frame is null ? fallbackFill : Brushes.Transparent;
+            glass.BorderBrush = frame is null ? fallbackRim : Brushes.Transparent;
+        }
+
+        WindowGlassRefresh.Attach(this, backdrop, glass, ApplyGlassFrame);
         Loaded += async (_, _) =>
         {
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
             if (!IsVisible) return;
-            var frame = await PanelGlass.CaptureAsync(0, PanelGlass.ScreenBounds(backdrop),
+            var frame = await PanelGlass.CaptureAsync(new WindowInteropHelper(this).Handle, PanelGlass.ScreenBounds(backdrop),
                 glass.CornerRadius.TopLeft, VisualTreeHelper.GetDpi(backdrop).DpiScaleX);
             if (!IsVisible) return;
-            if (frame is not null)
-            {
-                backdrop.Background = new ImageBrush(frame);
-                glass.Background = Brushes.Transparent;
-                glass.BorderBrush = Brushes.Transparent;
-            }
+            ApplyGlassFrame(frame);
             Opacity = 1;
         };
 
