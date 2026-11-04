@@ -52,7 +52,7 @@ public sealed class InstalledAppsWindow : Window
         Topmost = false;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        WindowAcrylic.ApplyAcrylic(this, 185, 16, 22, 32);
+        WindowAcrylic.ApplyAcrylic(this, 18, 210, 225, 245);
 
         _catalog = InstalledAppsService.Read();
 
@@ -72,13 +72,13 @@ public sealed class InstalledAppsWindow : Window
 
     private void BuildUI()
     {
-        // Deep Liquid Frosted Glass (GlassDesk standard)
+        // Clear liquid glass: light blur + faint white sheen, wallpaper shows through
         var glass = new Border
         {
             CornerRadius = new CornerRadius(22),
             Background = new LinearGradientBrush(
-                Color.FromArgb(198, 16, 22, 32),
-                Color.FromArgb(168, 12, 16, 24),
+                Color.FromArgb(38, 255, 255, 255),
+                Color.FromArgb(16, 255, 255, 255),
                 90),
             BorderBrush = new LinearGradientBrush(
                 Color.FromArgb(165, 255, 255, 255),

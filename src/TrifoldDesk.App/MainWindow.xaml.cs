@@ -49,7 +49,6 @@ public partial class MainWindow : Window
         foreach (var item in (shortcuts.Value.Items ?? []).Where(i => i != null && i.ScreenIndex is 0 or 1).OrderBy(i => i.Order))
         { try { Collection(item.ScreenIndex).Add(new ShortcutViewModel(item)); } catch (Exception ex) { App.Log(ex); _loadWarning += "\n部分入口加载失败，请检查日志。"; } }
         _viewModel.RebuildLibrary();
-        WindowAcrylic.ApplyAcrylic(this, 32, 18, 22, 30);
         _handle = new HandleWindow { Topmost = _settings.AlwaysOnTop };
         _dock = new DockBarWindow(_config);
         _launchpad = new LaunchpadWindow(item => _dock.PinItem(item));
@@ -315,12 +314,12 @@ public partial class MainWindow : Window
         if (_glassInitialized && !force && _idleGlassApplied == idle) return;
         _glassInitialized = true;
         _idleGlassApplied = idle;
-        double alpha = idle && _settings.TransparentIdle ? .08 : .16;
-        // Pure crystal-clear liquid frosted glass - no dark backing sheet
+        double alpha = idle && _settings.TransparentIdle ? .03 : .06;
+        // Clear glass frame: no blur, no dark backing — wallpaper stays fully visible
         var brush = new LinearGradientBrush(new GradientStopCollection
         {
             new(Color.FromArgb((byte)(alpha * 255), 255, 255, 255), 0),
-            new(Color.FromArgb((byte)(alpha * 0.55 * 255), 255, 255, 255), 1)
+            new(Color.FromArgb((byte)(alpha * 0.5 * 255), 255, 255, 255), 1)
         }, new Point(0, 0), new Point(0, 1));
         brush.Freeze();
         Resources["GlassFill"] = brush;

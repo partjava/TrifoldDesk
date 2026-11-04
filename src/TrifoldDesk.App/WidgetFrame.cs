@@ -62,7 +62,7 @@ public sealed class WidgetFrame : Border
         }
         else if (themed && model.Style == "ink")
         {
-            Background = new SolidColorBrush(Color.FromArgb(215, 12, 18, 28));
+            Background = new SolidColorBrush(Color.FromArgb(40, 12, 18, 28));
             BorderBrush = new SolidColorBrush(Color.FromArgb(75, 50, 75, 100));
         }
         else

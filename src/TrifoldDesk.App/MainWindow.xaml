@@ -5,7 +5,7 @@
  <Window.Resources>
    <Style x:Key="GlassPanel" TargetType="Border">
      <Setter Property="Background" Value="{DynamicResource GlassFill}"/>
-     <Setter Property="BorderBrush" Value="#35FFFFFF"/>
+     <Setter Property="BorderBrush" Value="#55FFFFFF"/>
      <Setter Property="BorderThickness" Value="1"/>
      <Setter Property="CornerRadius" Value="18"/>
      <Setter Property="Margin" Value="10,12,10,14"/>
