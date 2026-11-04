@@ -22,22 +22,23 @@ public sealed class PluginLibraryWindow : Window
         Result = PluginRules.Clone(current);
         Title = "插件库"; Width = 680; Height = 720; MinWidth = 420; MinHeight = 450;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        Background = PluginPreview.Fill("#162430"); Foreground = Brushes.WhiteSmoke;
-        if (Application.Current.MainWindow?.TryFindResource(typeof(ComboBox)) is Style comboStyle) Resources[typeof(ComboBox)] = comboStyle;
+        Background = (Brush)FindResource("DialogSilverBackdrop");
+        Foreground = PluginPreview.Fill("#233249");
+        Resources[typeof(Button)] = CreateButtonStyle();
         MaxHeight = SystemParameters.WorkArea.Height; MaxWidth = SystemParameters.WorkArea.Width;
         var root = new DockPanel { Margin = new Thickness(18) }; Content = root;
         var footer = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0) };
         DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
         footer.Children.Add(new Button { Content = "取消", IsCancel = true, Margin = new Thickness(0, 0, 12, 0) });
         var install=new Button{Content="导入插件…",Margin=new Thickness(0,0,12,0)};footer.Children.Insert(0,install);install.Click+=(_,_)=>InstallPlugin();
-        var save = new Button { Content = "保存", IsDefault = true }; save.Click += (_, _) => DialogResult = true; footer.Children.Add(save);
+        var save = new Button { Content = "保存", IsDefault = true, Background = PluginPreview.Fill("#87D5E0") }; save.Click += (_, _) => DialogResult = true; footer.Children.Add(save);
         var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         root.Children.Add(scroll); var body = new StackPanel(); scroll.Content = body; body.Children.Add(_cards);
         foreach (var id in AvailableIds)
         {
             var definition = PluginRules.Catalog.FirstOrDefault(p => p.Id == id);
             if (definition == null) continue;
-            var card = new Border { Background = PluginPreview.Fill("#22303C"), CornerRadius = new CornerRadius(9), Padding = new Thickness(12), Margin = new Thickness(0, 0, 8, 8), ToolTip = definition.Description };
+            var card = new Border { Background = PluginPreview.Fill("#CFFFFFFF"), CornerRadius = new CornerRadius(9), Padding = new Thickness(12), Margin = new Thickness(0, 0, 8, 8), ToolTip = definition.Description };
             var stack = new StackPanel(); card.Child = stack; _cards.Children.Add(card);
             var row = new DockPanel { Margin = new Thickness(0, 0, 0, 9) }; stack.Children.Add(row);
             var actions = new StackPanel { Orientation = Orientation.Horizontal }; DockPanel.SetDock(actions, Dock.Right); row.Children.Add(actions);
@@ -47,7 +48,7 @@ public sealed class PluginLibraryWindow : Window
             var style = new ComboBox { ItemsSource = new[] { "透明", "纸片", "霓虹", "深墨" }, SelectedIndex = 0 };
             var add = new Button { Content = "＋", ToolTip = "添加", Width = 30, Height = 30, Padding = new Thickness(0), FontSize = 17 };
             actions.Children.Add(add); _choices[id] = (add, pane, style);
-            row.Children.Add(new TextBlock { Text = DisplayName(id), FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brushes.WhiteSmoke, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+            row.Children.Add(new TextBlock { Text = DisplayName(id), FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = PluginPreview.Fill("#233249"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
             var preview = PluginPreview.Create(id); _previews[id] = preview; stack.Children.Add(preview);
             pane.SelectionChanged += (_, _) => RefreshAddButtons();
             add.Click += (_, _) =>
@@ -63,10 +64,23 @@ public sealed class PluginLibraryWindow : Window
             double width = Math.Max(1, _cards.ActualWidth); int columns = width >= 560 ? 2 : 1;
             foreach (var card in _cards.Children.OfType<Border>()) card.Width = Math.Max(1, width / columns - 8);
         };
-        body.Children.Add(new TextBlock { Text = "已添加", FontSize = 13, Foreground = PluginPreview.Fill("#B8C9D2"), Margin = new Thickness(0, 14, 0, 10) });
+        body.Children.Add(new TextBlock { Text = "已添加", FontSize = 13, Foreground = PluginPreview.Fill("#455970"), Margin = new Thickness(0, 14, 0, 10) });
         body.Children.Add(_instances);
         body.Children.Add(_installedExternal);
         Refresh();
+    }
+
+    internal static Style CreateButtonStyle()
+    {
+        var style = new Style(typeof(Button), (Style)Application.Current.FindResource(typeof(Button)));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, PluginPreview.Fill("#233249")));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, PluginPreview.Fill("#E4EDF3")));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty, PluginPreview.Fill("#A9B9C7")));
+        var label = new FrameworkElementFactory(typeof(TextBlock));
+        label.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding());
+        label.SetValue(TextBlock.ForegroundProperty, PluginPreview.Fill("#233249"));
+        style.Setters.Add(new Setter(ContentControl.ContentTemplateProperty, new DataTemplate { VisualTree = label }));
+        return style;
     }
 
     private void InstallPlugin()
@@ -97,7 +111,7 @@ public sealed class PluginLibraryWindow : Window
             var remove = new Button { Content = "移除", Padding = new Thickness(10, 5, 10, 5) }; DockPanel.SetDock(remove, Dock.Right); row.Children.Add(remove);
             string pane = item.PaneIndex is >= 0 and < 3 ? PaneNames[item.PaneIndex] : "未知位置";
             string label = !string.IsNullOrWhiteSpace(item.Title) && item.Title != DisplayName(item.PluginId) ? $"{DisplayName(item.PluginId)}（{item.Title}）" : DisplayName(item.PluginId);
-            row.Children.Add(new TextBlock { Text = $"{label}   ·   {pane}", FontSize = 13, Foreground = Brushes.WhiteSmoke, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+            row.Children.Add(new TextBlock { Text = $"{label}   ·   {pane}", FontSize = 13, Foreground = PluginPreview.Fill("#233249"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
             _instances.Children.Add(row); remove.Click += (_, _) => { Result.Items.Remove(item); Refresh(); };
         }
         _installedExternal.Children.Clear();
@@ -117,7 +131,7 @@ public sealed class PluginLibraryWindow : Window
                     var row = new DockPanel { Margin = new Thickness(0, 4, 8, 4) };
                     var add = new Button { Content = "＋", ToolTip = "添加到桌面", Width = 30, Height = 30, Padding = new Thickness(0), FontSize = 17, IsEnabled = PluginRules.CanAdd(Result, "external-plugin", 1) };
                     DockPanel.SetDock(add, Dock.Right); row.Children.Add(add);
-                    row.Children.Add(new TextBlock { Text = $"已安装扩展 · {manifest.Name} ({manifest.Id})", FontSize = 13, Foreground = PluginPreview.Fill("#B8C9D2"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+                    row.Children.Add(new TextBlock { Text = $"已安装扩展 · {manifest.Name} ({manifest.Id})", FontSize = 13, Foreground = PluginPreview.Fill("#455970"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
                     add.Click += (_, _) =>
                     {
                         if (!PluginRules.CanAdd(Result, "external-plugin", 1)) return;

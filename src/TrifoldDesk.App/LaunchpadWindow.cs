@@ -19,13 +19,17 @@ public sealed class LaunchpadWindow : Window
 
     private readonly Action<DockItem> _onPinToDock;
     private readonly List<InstalledApp> _allApps = [];
+    private readonly ComboBox _categoryFilter = new() { Width = 126, Height = 30, Margin = new Thickness(0, 0, 10, 0) };
     private List<InstalledApp> _filteredApps = [];
     private int _currentPage;
+    private readonly List<(int Start, int Count, string Label)> _categoryPages = [];
     private bool _loading;
     private bool _isOpen;
     private DateTime _lastToggleAt = DateTime.MinValue;
 
     private readonly Border _glass = new();
+    private readonly Border _backdrop = new() { IsHitTestVisible = false, Opacity = 1 };
+    private int _revealRevision;
     private readonly UniformGrid _grid = new() { Columns = Columns, Rows = Rows, Margin = new Thickness(18, 6, 18, 6) };
     private readonly Canvas _dragCanvas = new() { IsHitTestVisible = false };
     private readonly TextBox _searchBox = new();
@@ -59,7 +63,7 @@ public sealed class LaunchpadWindow : Window
         Height = 620;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        WindowAcrylic.ApplyAcrylic(this, 18, 210, 225, 245);
+        UseLayoutRounding = true;
 
         BuildUI();
 
@@ -90,51 +94,13 @@ public sealed class LaunchpadWindow : Window
     private void BuildUI()
     {
         _glass.CornerRadius = new CornerRadius(26);
-        // Clear liquid glass: light blur + faint white sheen, wallpaper shows through
-        _glass.Background = new LinearGradientBrush(
-            Color.FromArgb(38, 255, 255, 255),
-            Color.FromArgb(16, 255, 255, 255),
-            90);
-        _glass.BorderBrush = new LinearGradientBrush(
-            Color.FromArgb(165, 255, 255, 255),
-            Color.FromArgb(42, 255, 255, 255),
-            45);
-        _glass.BorderThickness = new Thickness(1.2);
-        _glass.Effect = new DropShadowEffect
-        {
-            BlurRadius = 42,
-            ShadowDepth = 10,
-            Direction = 270,
-            Opacity = 0.40,
-            Color = Colors.Black
-        };
-        _glass.ClipToBounds = true;
+
+        _glass.BorderThickness = new Thickness(1);
 
         var mainGrid = new Grid();
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(56) });
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(42) });
-
-        var topShine = new Border
-        {
-            Height = 1.2,
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(36, 1, 36, 0),
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new Point(0, 0),
-                EndPoint = new Point(1, 0),
-                GradientStops =
-                [
-                    new(Color.FromArgb(0, 255, 255, 255), 0.0),
-                    new(Color.FromArgb(180, 255, 255, 255), 0.5),
-                    new(Color.FromArgb(0, 255, 255, 255), 1.0)
-                ]
-            },
-            IsHitTestVisible = false
-        };
-        Grid.SetRowSpan(topShine, 3);
-        mainGrid.Children.Add(topShine);
 
         var searchBar = BuildSearchBar();
         Grid.SetRow(searchBar, 0);
@@ -154,8 +120,17 @@ public sealed class LaunchpadWindow : Window
         mainGrid.Children.Add(_dragCanvas);
 
         _glass.Child = mainGrid;
-        Content = _glass;
+        var root = new Grid();
+        root.Children.Add(_backdrop);
+        root.Children.Add(_glass);
+        Content = root;
     }
+
+    private static Brush ControlGlassFill { get; } = new LinearGradientBrush(
+        Color.FromArgb(62, 255, 255, 255), Color.FromArgb(32, 26, 45, 68), 90);
+
+    private static Brush ControlGlassRim { get; } = new LinearGradientBrush(
+        Color.FromArgb(140, 255, 255, 255), Color.FromArgb(45, 24, 34, 48), 65);
 
     private FrameworkElement BuildSearchBar()
     {
@@ -171,8 +146,8 @@ public sealed class LaunchpadWindow : Window
             Width = 360,
             Height = 36,
             CornerRadius = new CornerRadius(18),
-            Background = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)),
+            Background = ControlGlassFill,
+            BorderBrush = ControlGlassRim,
             BorderThickness = new Thickness(1),
             Margin = new Thickness(0, 0, 10, 0)
         };
@@ -218,8 +193,8 @@ public sealed class LaunchpadWindow : Window
         {
             Height = 36,
             CornerRadius = new CornerRadius(18),
-            Background = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)),
+            Background = ControlGlassFill,
+            BorderBrush = ControlGlassRim,
             BorderThickness = new Thickness(1),
             Padding = new Thickness(16, 0, 16, 0),
             Cursor = Cursors.Hand,
@@ -235,7 +210,7 @@ public sealed class LaunchpadWindow : Window
         };
         addBtn.Child = addText;
         addBtn.MouseEnter += (_, _) => addBtn.Background = new SolidColorBrush(Color.FromArgb(50, 255, 255, 255));
-        addBtn.MouseLeave += (_, _) => addBtn.Background = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255));
+        addBtn.MouseLeave += (_, _) => addBtn.Background = ControlGlassFill;
         addBtn.MouseLeftButtonUp += (_, _) =>
         {
             Dismiss();
@@ -254,6 +229,11 @@ public sealed class LaunchpadWindow : Window
             }
         };
 
+        _categoryFilter.Items.Add("全部分类");
+        foreach (var category in LaunchpadCategories.Labels) _categoryFilter.Items.Add(category);
+        _categoryFilter.SelectedIndex = 0;
+        _categoryFilter.SelectionChanged += (_, _) => ApplyFilter();
+        headerDock.Children.Add(_categoryFilter);
         headerDock.Children.Add(searchContainer);
         headerDock.Children.Add(addBtn);
         return headerDock;
@@ -264,8 +244,8 @@ public sealed class LaunchpadWindow : Window
         var pill = new Border
         {
             CornerRadius = new CornerRadius(16),
-            Background = new SolidColorBrush(Color.FromArgb(42, 255, 255, 255)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(60, 255, 255, 255)),
+            Background = ControlGlassFill,
+            BorderBrush = ControlGlassRim,
             BorderThickness = new Thickness(1),
             Padding = new Thickness(8, 2, 8, 2),
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -342,14 +322,56 @@ public sealed class LaunchpadWindow : Window
         }
     }
 
-    private void ShowLaunchpad()
+    private static Brush LaunchpadFallbackTint { get; } =
+        new SolidColorBrush(Color.FromArgb(12, 240, 247, 255));
+
+    private static Brush LaunchpadFallbackRim { get; } = new LinearGradientBrush(
+        Color.FromArgb(155, 255, 255, 255), Color.FromArgb(40, 24, 29, 38), 55);
+
+    private async void ShowLaunchpad()
     {
         _isOpen = true;
+        int revision = ++_revealRevision;
+        _backdrop.Background = null;
+        _glass.OpacityMask = null;
+        _glass.BorderBrush = LaunchpadFallbackRim;
+        _glass.Background = LaunchpadFallbackTint;
         BeginAnimation(OpacityProperty, null);
         Opacity = 0;
         Show();
         Activate();
         _searchBox.Focus();
+
+        // Let WPF lay out the invisible window before sampling the desktop underneath it.
+        await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+        if (!_isOpen || revision != _revealRevision) return;
+
+        var start = _backdrop.PointToScreen(new Point());
+        var end = _backdrop.PointToScreen(new Point(_backdrop.ActualWidth, _backdrop.ActualHeight));
+        var area = System.Drawing.Rectangle.FromLTRB((int)Math.Round(start.X), (int)Math.Round(start.Y),
+            (int)Math.Round(end.X), (int)Math.Round(end.Y));
+        if (area.Width > 0 && area.Height > 0)
+        {
+            double scale = VisualTreeHelper.GetDpi(_backdrop).DpiScaleX;
+            double radius = _glass.CornerRadius.TopLeft * scale;
+            try
+            {
+                var frame = await Task.Run(() => DockGlassRenderer.Render(0, area, radius, scale,
+                    launchpad: true));
+                if (_isOpen && revision == _revealRevision && frame is not null)
+                {
+                    _backdrop.Background = new ImageBrush(frame);
+                    _glass.Background = Brushes.Transparent;
+                    _glass.BorderBrush = Brushes.Transparent;
+                }
+            }
+            catch (Exception error) when (error is System.ComponentModel.Win32Exception
+                or System.Runtime.InteropServices.ExternalException or ArgumentException or OutOfMemoryException)
+            {
+                System.Diagnostics.Debug.WriteLine(error);
+            }
+        }
+        if (!_isOpen || revision != _revealRevision) return;
 
         var anim = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(160))
         {
@@ -368,6 +390,7 @@ public sealed class LaunchpadWindow : Window
     {
         if (!_isOpen) return;
         _isOpen = false;
+        ++_revealRevision;
 
         var anim = new DoubleAnimation(0.0, TimeSpan.FromMilliseconds(120))
         {
@@ -446,17 +469,26 @@ public sealed class LaunchpadWindow : Window
     private void ApplyFilter()
     {
         string query = _searchBox.Text.Trim();
-        if (string.IsNullOrEmpty(query))
+        int category = _categoryFilter.SelectedIndex - 1;
+        _filteredApps = _allApps
+            .Select(app => (App: app, Category: LaunchpadCategories.GetIndex(app)))
+            .Where(item => (category < 0 || item.Category == category) &&
+                (item.App.DisplayName.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+                 || item.App.ShellPath.Contains(query, StringComparison.OrdinalIgnoreCase)
+                 || item.App.TargetPath.Contains(query, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(item => item.Category)
+            .Select(item => item.App)
+            .ToList();
+
+        _categoryPages.Clear();
+        var labels = LaunchpadCategories.Labels.ToArray();
+        int start = 0;
+        foreach (var group in _filteredApps.GroupBy(LaunchpadCategories.GetIndex))
         {
-            _filteredApps = [.. _allApps];
-        }
-        else
-        {
-            _filteredApps = _allApps
-                .Where(a => a.DisplayName.Contains(query, StringComparison.CurrentCultureIgnoreCase)
-                            || a.ShellPath.Contains(query, StringComparison.OrdinalIgnoreCase)
-                            || a.TargetPath.Contains(query, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            int count = group.Count();
+            for (int offset = 0; offset < count; offset += PageSize)
+                _categoryPages.Add((start + offset, Math.Min(PageSize, count - offset), labels[group.Key]));
+            start += count;
         }
 
         _currentPage = 0;
@@ -480,16 +512,17 @@ public sealed class LaunchpadWindow : Window
             return;
         }
 
-        int totalPages = Math.Max(1, (int)Math.Ceiling(_filteredApps.Count / (double)PageSize));
+        int totalPages = _categoryPages.Count;
         _currentPage = Math.Clamp(_currentPage, 0, totalPages - 1);
 
-        _pageLabel.Text = $"{_currentPage + 1} / {totalPages}";
+        var page = _categoryPages[_currentPage];
+        _pageLabel.Text = $"{page.Label}  ·  {_currentPage + 1} / {totalPages}";
         _prevBtn.IsEnabled = _currentPage > 0;
         _nextBtn.IsEnabled = _currentPage < totalPages - 1;
 
         var pageItems = _filteredApps
-            .Skip(_currentPage * PageSize)
-            .Take(PageSize)
+            .Skip(page.Start)
+            .Take(page.Count)
             .ToList();
 
         double dpi = VisualTreeHelper.GetDpi(this).DpiScaleX;
@@ -725,24 +758,28 @@ public sealed class LaunchpadWindow : Window
                 double cellH = _grid.ActualHeight / Rows;
                 int col = Math.Clamp((int)(gridPos.X / cellW), 0, Columns - 1);
                 int row = Math.Clamp((int)(gridPos.Y / cellH), 0, Rows - 1);
-                int slotIdx = _currentPage * PageSize + row * Columns + col;
-                slotIdx = Math.Clamp(slotIdx, 0, _filteredApps.Count - 1);
+                if (_categoryPages.Count == 0) return;
+                var page = _categoryPages[_currentPage];
+                int slotIdx = page.Start + Math.Min(row * Columns + col, page.Count - 1);
 
                 if (slotIdx != _dragTargetIndex)
                 {
                     _dragTargetIndex = slotIdx;
                     int curIdx = _filteredApps.IndexOf(_draggedApp);
-                    if (curIdx >= 0 && curIdx != _dragTargetIndex)
+                    var targetApp = _filteredApps[_dragTargetIndex];
+                    if (curIdx >= 0 && curIdx != _dragTargetIndex &&
+                        LaunchpadCategories.GetIndex(_draggedApp) == LaunchpadCategories.GetIndex(targetApp))
                     {
                         _filteredApps.RemoveAt(curIdx);
                         _filteredApps.Insert(_dragTargetIndex, _draggedApp);
 
                         // Also reflect in _allApps
                         int allCurIdx = _allApps.IndexOf(_draggedApp);
-                        if (allCurIdx >= 0)
+                        int allTargetIdx = _allApps.IndexOf(targetApp);
+                        if (allCurIdx >= 0 && allTargetIdx >= 0)
                         {
                             _allApps.RemoveAt(allCurIdx);
-                            int allTargetIdx = Math.Clamp(_dragTargetIndex, 0, _allApps.Count);
+
                             _allApps.Insert(allTargetIdx, _draggedApp);
                         }
                         RenderPage();
@@ -794,7 +831,7 @@ public sealed class LaunchpadWindow : Window
 
     private void NextPage()
     {
-        int totalPages = Math.Max(1, (int)Math.Ceiling(_filteredApps.Count / (double)PageSize));
+        int totalPages = _categoryPages.Count;
         if (_currentPage < totalPages - 1)
         {
             _currentPage++;

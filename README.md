@@ -20,24 +20,28 @@ Windows 桌面整理工具：用左、中、右三个可独立折叠的页面，
 
 操作集中在右键菜单，桌面仅保留内容与必要的控件。
 
+- **程序坞与应用启动台**：固定应用、拖拽排序、悬停放大、自动隐藏；启动台支持分类浏览、搜索和分页。
+- **液态玻璃**：启动台、添加应用窗口、程序坞和非文件夹桌面组件对屏幕背景做轻度模糊和边缘折射。无法采集时使用半透明背景。
+
+
 ## 下载运行
 
 [下载 Windows x64 中文安装包](https://github.com/partjava/TrifoldDesk/releases/latest)。下载 Setup EXE 后双击，按向导选择安装位置。安装版内置运行环境，无需单独安装 .NET；支持开始菜单、可选桌面快捷方式、开机自启动与卸载。旧版 ZIP 免安装包仍需 .NET 8 Windows Desktop Runtime。
 
 ## 从源码构建
 
-当前源码版本为 **0.10.17**。适用于 Windows 10 2004（19041）及更新版本、Windows 11 x64。公开安装包以发布页为准。
+当前源码版本为 **0.10.18**。适用于 Windows 10 2004（19041）及更新版本、Windows 11 x64。公开安装包以发布页为准。
 
 安装 .NET 8 SDK，或具备 .NET 8 目标框架支持的更新 SDK，然后在项目根目录打开 PowerShell：
 
 ```powershell
 git clone https://github.com/partjava/TrifoldDesk.git
 cd TrifoldDesk
-.\Build.ps1 -Test -Version '0.10.17'
+.\Build.ps1 -Test -Version '0.10.18'
 .\启动三折桌面.bat
 ```
 
-构建结果位于 `dist/v0.10.17/`。运行需要 **.NET 8 Windows Desktop Runtime x64**，请保留整个发布目录，不能只复制 EXE。首次构建需联网恢复Windows SDK和LibreHardwareMonitor依赖。
+构建结果位于 `dist/v0.10.18/`。运行需要 **.NET 8 Windows Desktop Runtime x64**，请保留整个发布目录，不能只复制 EXE。首次构建需联网恢复Windows SDK和LibreHardwareMonitor依赖。
 
 ## 使用
 
@@ -80,6 +84,9 @@ cd TrifoldDesk
 本仓库尚未选定项目许可证，安全使用约定不是开源许可证。源码、图标和效果图的授权范围需由维护者另行明确。
 
 硬件监控依赖 [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)（当前包版本 0.9.6，包元数据标注 MPL-2.0）；其他依赖保留各自许可证。重新分发前应核对对应版本的许可证与声明，不以本项目的安全约定覆盖第三方授权。
+
+玻璃渲染的部分源码改编自 GlassDesk 1.4.0 与 Kyant 的 AndroidLiquidGlass，相关部分使用 Apache-2.0。安装包随附许可证和署名说明。 [LICENSE](src/TrifoldDesk.App/ThirdParty/DockGlass/LICENSE) · [NOTICE](src/TrifoldDesk.App/ThirdParty/DockGlass/NOTICE)
+
 
 ## 后续更新计划
 

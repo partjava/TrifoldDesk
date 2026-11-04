@@ -13,11 +13,11 @@ public sealed class WidgetFrame : Border
     private readonly List<Thumb> _corners = [];
     private double _resizeDx, _resizeDy;
     private bool _resizeLeft, _resizeTop;
-    private readonly Button _fold = new(), _lock = new();
+    private readonly MenuItem _lockEntry = new() { Header = "锁定位置", IsCheckable = true };
+    private readonly MenuItem _foldEntry = new();
     private readonly Grid _grid = new();
     private readonly TextBlock _title = new();
     private MenuItem? _auto;
-    private StackPanel? _actions;
     private readonly DispatcherTimer _leaveTimer = new() { Interval = TimeSpan.FromMilliseconds(650) };
     private readonly Func<WidgetInstance, bool> _save;
     private WidgetInstance? _before;
@@ -74,10 +74,9 @@ public sealed class WidgetFrame : Border
             }
             else
             {
-                // Liquid Frosted Glass styling for general widgets (except folders)
                 Background = new LinearGradientBrush(
-                    Color.FromArgb(28, 255, 255, 255),
-                    Color.FromArgb(12, 255, 255, 255),
+                    Color.FromArgb(38, 240, 247, 255),
+                    Color.FromArgb(16, 240, 247, 255),
                     90);
                 BorderBrush = new LinearGradientBrush(
                     Color.FromArgb(115, 255, 255, 255),
@@ -102,15 +101,8 @@ public sealed class WidgetFrame : Border
         else if (model.Style == "glass") _title.Effect = TextContrast.Shadow;
         _title.VerticalAlignment = VerticalAlignment.Center; _title.Margin = new Thickness(0, 0, 8, 0); _title.IsHitTestVisible = false; header.Children.Add(_title);
         _title.Visibility = model.IsCollapsed ? Visibility.Visible : Visibility.Collapsed;
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = model.IsCollapsed ? VerticalAlignment.Center : VerticalAlignment.Top, Margin = model.IsCollapsed ? new Thickness(0) : new Thickness(0, 3, 0, 0) }; header.Children.Add(actions);
-        _actions = actions;
-        actions.Visibility = Visibility.Visible;
-        actions.Opacity = model.IsCollapsed ? 1 : 0;
-        MouseEnter += (_, _) => { actions.Opacity = 1; _resize.Opacity = 1; if (folderFrame) BorderBrush = new SolidColorBrush(Color.FromArgb(50, 255, 255, 255)); };
-        MouseLeave += (_, _) => { if (!Model.IsCollapsed) actions.Opacity = 0; _resize.Opacity = 0; if (folderFrame) BorderBrush = Brushes.Transparent; };
-        foreach (var button in new[] { _lock, _fold }) { button.Padding = new Thickness(6, 2, 6, 2); button.FontSize = 10; button.Margin = new Thickness(3, 0, 0, 0); actions.Children.Add(button); }
-        _lock.ToolTip = "锁定/解锁位置与尺寸"; _lock.Click += (_, _) => ChangeState(() => Model.IsLocked = !Model.IsLocked);
-        _fold.ToolTip = "收起/展开"; _fold.Click += (_, _) => ToggleCollapsed();
+        MouseEnter += (_, _) => { _resize.Opacity = 1; if (folderFrame) BorderBrush = new SolidColorBrush(Color.FromArgb(50, 255, 255, 255)); };
+        MouseLeave += (_, _) => { _resize.Opacity = 0; if (folderFrame) BorderBrush = Brushes.Transparent; };
         var bodyHolder = new Border { Padding = folderFrame ? new Thickness(1, 0, 1, 4) : new Thickness(10, 8, 10, 10), Child = body }; Grid.SetRow(bodyHolder, 1); grid.Children.Add(bodyHolder);
         _resize.Width = 20; _resize.Height = 20; _resize.HorizontalAlignment = HorizontalAlignment.Right; _resize.VerticalAlignment = VerticalAlignment.Bottom; _resize.Cursor = Cursors.SizeNWSE;
         _resize.Width=12; _resize.Height=12;
@@ -128,11 +120,11 @@ public sealed class WidgetFrame : Border
         _resize.DragDelta += (_, e) => Resize(e.HorizontalChange, e.VerticalChange);
         _move.DragCompleted += EndGesture; _resize.DragCompleted += EndGesture;
         var menu = body is FolderWidget && body.ContextMenu is ContextMenu existingMenu ? existingMenu : new ContextMenu(); ContextMenu = menu;
-        var lockEntry = new MenuItem { Header="锁定位置", IsCheckable=true }; lockEntry.Click+=(_,_)=>ChangeState(()=>Model.IsLocked=!Model.IsLocked);
-        var foldEntry = new MenuItem(); foldEntry.Click+=(_,_)=>ToggleCollapsed();
-        if (ReferenceEquals(menu, body.ContextMenu)) { menu.Items.Insert(0, lockEntry); menu.Items.Insert(1, foldEntry); }
-        else { menu.Items.Add(lockEntry); menu.Items.Add(foldEntry); }
-        menu.Opened+=(_,_)=>{lockEntry.IsChecked=Model.IsLocked;foldEntry.Header=Model.IsCollapsed?"展开":"收起";};
+        _lockEntry.Click += (_, _) => ChangeState(() => Model.IsLocked = !Model.IsLocked);
+        _foldEntry.Click += (_, _) => ToggleCollapsed();
+        if (ReferenceEquals(menu, body.ContextMenu)) { menu.Items.Insert(0, _lockEntry); menu.Items.Insert(1, _foldEntry); }
+        else { menu.Items.Add(_lockEntry); menu.Items.Add(_foldEntry); }
+        menu.Opened+=(_,_)=>{_lockEntry.IsChecked=Model.IsLocked;_foldEntry.Header=Model.IsCollapsed?"展开":"收起";};
         if (body is FolderWidget)
         {
             body.ContextMenu = menu;
@@ -151,6 +143,7 @@ public sealed class WidgetFrame : Border
         _leaveTimer.Tick += (_, _) => { _leaveTimer.Stop(); if (!InteractionActive && !IsMouseOver && !IsKeyboardFocusWithin && !Model.IsCollapsed && Window.GetWindow(this)?.OwnedWindows.Cast<Window>().Any(w => w.IsVisible && w.IsActive) != true) ToggleCollapsed(); };
         Unloaded += (_, _) => _leaveTimer.Stop();
         PreviewMouseDown += (_, _) => { int highest = _canvas.Children.OfType<UIElement>().Select(Panel.GetZIndex).DefaultIfEmpty().Max(); Panel.SetZIndex(this, highest + 1); };
+        if (!folderFrame) TrifoldDesk.Services.PanelGlass.AttachWidget(this);
         UpdateState(); Constrain(false);
     }
     private void BeginGesture(object sender, DragStartedEventArgs e) { _gesturing = true; _before = Copy(); _dragX=Model.X; _dragY=Model.Y; _resizeDx=0; _resizeDy=0; _leaveTimer.Stop(); }
@@ -237,16 +230,6 @@ public sealed class WidgetFrame : Border
         if (_grid.RowDefinitions.Count > 0) _grid.RowDefinitions[0].Height = new GridLength(Model.IsCollapsed ? 48 : (folderFrame ? 4 : 8));
         _title.Text = string.IsNullOrWhiteSpace(Model.Title) ? PluginRules.Catalog.First(p => p.Id == Model.PluginId).Name : Model.Title;
         ToolTip = _title.Text;
-        _fold.Content = Model.IsCollapsed ? "展开" : "收起"; _lock.Content = Model.IsLocked ? "锁定" : "自由";
-        bool phone = Model.IsCollapsed && _body is FolderWidget;
-        _title.Margin = new Thickness(0,0,phone ? 34 : 8,0); _lock.Visibility = phone ? Visibility.Collapsed : Visibility.Visible;
-        if (phone) _fold.Content = "↗";
-        if (_actions != null)
-        {
-            _actions.VerticalAlignment = Model.IsCollapsed ? VerticalAlignment.Center : VerticalAlignment.Top;
-            _actions.Margin = Model.IsCollapsed ? new Thickness(0) : new Thickness(0, 3, 0, 0);
-            _actions.Opacity = Model.IsCollapsed || IsMouseOver ? 1 : 0;
-        }
         _move.Height = Model.IsCollapsed ? 48 : (folderFrame ? 4 : 14);
         _resize.Opacity = IsMouseOver ? 1 : 0;
         if (_body is FolderWidget folder) folder.SetCompact(Model.IsCollapsed);
@@ -265,7 +248,7 @@ public sealed class WidgetFrame : Border
     internal void TestEdgeFinish(bool accepted)=>FinishFolderEdge(accepted);
     internal void TestResize(double x, double y) { _resize.RaiseEvent(new DragStartedEventArgs(0, 0)); _resize.RaiseEvent(new DragDeltaEventArgs(x, y)); _resize.RaiseEvent(new DragCompletedEventArgs(x, y, false)); }
     internal void TestCornerResize(int corner,double x,double y) { var thumb=_corners[corner]; thumb.RaiseEvent(new DragStartedEventArgs(0,0)); thumb.RaiseEvent(new DragDeltaEventArgs(x,y)); thumb.RaiseEvent(new DragCompletedEventArgs(x,y,false)); }
-    internal void TestLock() => _lock.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-    internal void TestCollapse() => _fold.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    internal void TestLock() => _lockEntry.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+    internal void TestCollapse() => _foldEntry.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
     internal void TestAutoCollapse() { if (_auto != null) { _auto.IsChecked = !_auto.IsChecked; _auto.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent)); } }
 }

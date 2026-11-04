@@ -314,7 +314,7 @@ public partial class MainWindow : Window
         if (_glassInitialized && !force && _idleGlassApplied == idle) return;
         _glassInitialized = true;
         _idleGlassApplied = idle;
-        double alpha = idle && _settings.TransparentIdle ? .03 : .06;
+        double alpha = _settings.GlassOpacity * (idle && _settings.TransparentIdle ? .5 : 1);
         // Clear glass frame: no blur, no dark backing — wallpaper stays fully visible
         var brush = new LinearGradientBrush(new GradientStopCollection
         {

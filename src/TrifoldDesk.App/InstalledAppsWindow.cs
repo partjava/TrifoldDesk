@@ -1,7 +1,7 @@
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Media.Effects;
+using System.Windows.Threading;
 using System.Windows.Media.Imaging;
 using TrifoldDesk.Services;
 
@@ -52,7 +52,7 @@ public sealed class InstalledAppsWindow : Window
         Topmost = false;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        WindowAcrylic.ApplyAcrylic(this, 18, 210, 225, 245);
+        Opacity = 0;
 
         _catalog = InstalledAppsService.Read();
 
@@ -85,14 +85,6 @@ public sealed class InstalledAppsWindow : Window
                 Color.FromArgb(42, 255, 255, 255),
                 45),
             BorderThickness = new Thickness(1.2),
-            Effect = new DropShadowEffect
-            {
-                BlurRadius = 36,
-                ShadowDepth = 8,
-                Direction = 270,
-                Opacity = 0.38,
-                Color = Colors.Black
-            },
             ClipToBounds = true
         };
 
@@ -100,27 +92,6 @@ public sealed class InstalledAppsWindow : Window
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(38) }); // Tight header
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // 5-column Edge-to-Edge Grid
         mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(46) }); // Compact Action Bar
-
-        var shine = new Border
-        {
-            Height = 1.0,
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(32, 1, 32, 0),
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new Point(0, 0),
-                EndPoint = new Point(1, 0),
-                GradientStops =
-                [
-                    new(Color.FromArgb(0, 255, 255, 255), 0.0),
-                    new(Color.FromArgb(160, 255, 255, 255), 0.5),
-                    new(Color.FromArgb(0, 255, 255, 255), 1.0)
-                ]
-            },
-            IsHitTestVisible = false
-        };
-        Grid.SetRowSpan(shine, 3);
-        mainGrid.Children.Add(shine);
 
         // Row 0: Centered capsule search bar + guaranteed close button
         var header = BuildHeader();
@@ -145,7 +116,26 @@ public sealed class InstalledAppsWindow : Window
         mainGrid.Children.Add(actionBar);
 
         glass.Child = mainGrid;
-        Content = glass;
+        var backdrop = new Border { IsHitTestVisible = false };
+        var root = new Grid();
+        root.Children.Add(backdrop);
+        root.Children.Add(glass);
+        Content = root;
+        Loaded += async (_, _) =>
+        {
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
+            if (!IsVisible) return;
+            var frame = await PanelGlass.CaptureAsync(0, PanelGlass.ScreenBounds(backdrop),
+                glass.CornerRadius.TopLeft, VisualTreeHelper.GetDpi(backdrop).DpiScaleX);
+            if (!IsVisible) return;
+            if (frame is not null)
+            {
+                backdrop.Background = new ImageBrush(frame);
+                glass.Background = Brushes.Transparent;
+                glass.BorderBrush = Brushes.Transparent;
+            }
+            Opacity = 1;
+        };
 
         _searchBox.TextChanged += (_, _) =>
         {

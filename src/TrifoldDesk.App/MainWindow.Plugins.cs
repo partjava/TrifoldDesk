@@ -52,7 +52,8 @@ public partial class MainWindow
         {
             _managementHost ??= ManagementContent.Parent as ContentControl;
             Detach(ManagementContent);
-            var dialog = new Window { Owner = this, Title = "全部入口管理", Width = 650, Height = 760, MaxHeight = SystemParameters.WorkArea.Height, Background = new SolidColorBrush(Color.FromRgb(22, 36, 48)), WindowStartupLocation = WindowStartupLocation.CenterOwner, DataContext = _viewModel, Content = ManagementContent };
+            var dialog = new Window { Owner = this, Title = "全部入口管理", Width = 650, Height = 760, MaxHeight = SystemParameters.WorkArea.Height, Background = (Brush)FindResource("DialogSilverBackdrop"), WindowStartupLocation = WindowStartupLocation.CenterOwner, DataContext = _viewModel, Content = ManagementContent };
+            dialog.Resources[typeof(Button)] = PluginLibraryWindow.CreateButtonStyle();
             ManagementContent.Margin = new Thickness(24);
             try { dialog.ShowDialog(); }
             finally { dialog.Content = null; ManagementContent.Margin = new Thickness(0); if (_managementHost != null) _managementHost.Content = ManagementContent; }

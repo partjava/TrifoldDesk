@@ -21,6 +21,11 @@ public sealed class DockBarWindow : Window
     private readonly StackPanel _mainStack = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly StackPanel _itemsPanel = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly Border _pill = new();
+    private readonly Border _glass = new() { IsHitTestVisible = false };
+    private readonly DispatcherTimer _glassTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private bool _glassRendering;
+    private bool _glassClosed;
+    private int _glassRevision;
     private readonly DispatcherTimer _hideTimer = new() { Interval = TimeSpan.FromMilliseconds(450) };
     private readonly DispatcherTimer _edgeTriggerTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private bool _isSlidDown;
@@ -65,16 +70,22 @@ public sealed class DockBarWindow : Window
 
         Topmost = _config.AlwaysOnTop;
 
-        WindowAcrylic.ApplyAcrylic(this, 18, 210, 225, 245);
+        _glassTimer.Tick += RefreshGlass;
 
         BuildUI();
 
         Loaded += (_, _) => Reposition();
+        IsVisibleChanged += (_, _) => QueueGlassRefresh();
+        DpiChanged += (_, _) => QueueGlassRefresh();
+
         SizeChanged += (_, _) => Reposition();
         SystemEvents.DisplaySettingsChanged += OnDisplayChanged;
         Closed += (_, _) =>
         {
             SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
+
+            _glassClosed = true;
+            _glassTimer.Stop();
             _hideTimer.Stop();
             _edgeTriggerTimer.Stop();
         };
@@ -155,47 +166,18 @@ public sealed class DockBarWindow : Window
     {
         _pill.CornerRadius = new CornerRadius(24);
         _pill.Padding = new Thickness(10, 5, 10, 5);
-        // Clear liquid glass: light blur + faint white sheen, wallpaper shows through
-        _pill.Background = new LinearGradientBrush(
-            Color.FromArgb(38, 255, 255, 255),
-            Color.FromArgb(16, 255, 255, 255),
-            90);
+        _pill.Background = Brushes.Transparent;
         _pill.BorderBrush = new LinearGradientBrush(
-            Color.FromArgb(165, 255, 255, 255),
-            Color.FromArgb(42, 255, 255, 255),
+            Color.FromArgb(125, 255, 255, 255),
+            Color.FromArgb(24, 255, 255, 255),
             45);
         _pill.BorderThickness = new Thickness(1.2);
-        _pill.Effect = new DropShadowEffect
-        {
-            BlurRadius = 28,
-            ShadowDepth = 6,
-            Direction = 270,
-            Opacity = 0.35,
-            Color = Colors.Black
-        };
-
+        _glass.CornerRadius = _pill.CornerRadius;
+        _glass.Background = GlassFallback;
         var root = new Grid();
+        root.Children.Add(_glass);
         root.Children.Add(_pill);
 
-        var topShine = new Border
-        {
-            Height = 1.2,
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(24, 1, 24, 0),
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new Point(0, 0),
-                EndPoint = new Point(1, 0),
-                GradientStops =
-                [
-                    new(Color.FromArgb(0, 255, 255, 255), 0.0),
-                    new(Color.FromArgb(180, 255, 255, 255), 0.5),
-                    new(Color.FromArgb(0, 255, 255, 255), 1.0)
-                ]
-            },
-            IsHitTestVisible = false
-        };
-        root.Children.Add(topShine);
         Content = root;
 
         var contextMenu = new ContextMenu();
@@ -416,6 +398,8 @@ public sealed class DockBarWindow : Window
             var icon = new Image
             {
                 Source = iconSource,
+                SnapsToDevicePixels = true,
+                UseLayoutRounding = true,
                 Width = 36,
                 Height = 36,
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -428,6 +412,8 @@ public sealed class DockBarWindow : Window
         {
             var fallback = new Border
             {
+                SnapsToDevicePixels = true,
+                UseLayoutRounding = true,
                 Width = 36,
                 Height = 36,
                 CornerRadius = new CornerRadius(9),
@@ -809,11 +795,14 @@ public sealed class DockBarWindow : Window
         Left = Math.Round(x);
         _normalTop = Math.Round(y);
         if (!_isSlidDown) Top = _normalTop;
+        QueueGlassRefresh();
     }
 
     private void SlideDock(bool down)
     {
         _isSlidDown = down;
+        _glassRevision++;
+        _glassTimer.Stop();
         var screen = Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
         var source = PresentationSource.FromVisual(this);
         double dpiY = source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
@@ -830,8 +819,64 @@ public sealed class DockBarWindow : Window
         {
             BeginAnimation(TopProperty, null);
             Top = targetTop;
+            QueueGlassRefresh();
         };
         BeginAnimation(TopProperty, anim);
+    }
+
+    private static SolidColorBrush GlassFallback { get; } =
+        new(Color.FromArgb(20, 255, 255, 255));
+
+    private void QueueGlassRefresh()
+    {
+        _glassRevision++;
+        _glassTimer.Stop();
+        if (!_glassClosed && IsVisible && !_isSlidDown)
+            _glassTimer.Start();
+    }
+
+    private async void RefreshGlass(object? sender, EventArgs e)
+    {
+        _glassTimer.Stop();
+        if (_glassRendering || _glassClosed || !IsVisible || _isSlidDown ||
+            _glass.ActualWidth <= 0 || _glass.ActualHeight <= 0 ||
+            PresentationSource.FromVisual(_glass) is null) return;
+
+        var origin = _glass.PointToScreen(new Point());
+        var end = _glass.PointToScreen(new Point(_glass.ActualWidth, _glass.ActualHeight));
+        var area = System.Drawing.Rectangle.FromLTRB(
+            (int)Math.Round(origin.X), (int)Math.Round(origin.Y),
+            (int)Math.Round(end.X), (int)Math.Round(end.Y));
+        if (area.Width <= 0 || area.Height <= 0) return;
+
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        double scale = VisualTreeHelper.GetDpi(_glass).DpiScaleX;
+        double radius = _glass.CornerRadius.TopLeft * scale;
+        int revision = _glassRevision;
+        _glassRendering = true;
+        try
+        {
+            BitmapSource? frame = null;
+            try
+            {
+                frame = await Task.Run(() => DockGlassRenderer.Render(hwnd, area, radius, scale));
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException
+                or ArgumentException or ExternalException or OutOfMemoryException or System.ComponentModel.Win32Exception)
+            {
+                Debug.WriteLine(error);
+            }
+
+            if (!_glassClosed && revision == _glassRevision)
+                _glass.Background = frame is null ? GlassFallback : new ImageBrush(frame);
+        }
+        finally
+        {
+            _glassRendering = false;
+            if (!_glassClosed && IsVisible && !_isSlidDown &&
+                (revision != _glassRevision || _glass.Background is ImageBrush))
+                _glassTimer.Start();
+        }
     }
 
     private static void AnimateScale(ScaleTransform transform, double target)

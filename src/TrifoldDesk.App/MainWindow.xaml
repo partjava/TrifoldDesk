@@ -5,10 +5,6 @@
  <Window.Resources>
    <Style x:Key="GlassPanel" TargetType="Border">
      <Setter Property="Background" Value="{DynamicResource GlassFill}"/>
-     <Setter Property="BorderBrush" Value="#55FFFFFF"/>
-     <Setter Property="BorderThickness" Value="1"/>
-     <Setter Property="CornerRadius" Value="18"/>
-     <Setter Property="Margin" Value="10,12,10,14"/>
    </Style>
   <Style x:Key="SectionTitle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}"><Setter Property="FontSize" Value="28"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
   <Style x:Key="Caption" TargetType="TextBlock"><Setter Property="FontSize" Value="12"/><Setter Property="Foreground" Value="{StaticResource Muted}"/></Style>
@@ -34,7 +30,7 @@
  <Grid ClipToBounds="True">
   <Grid x:Name="PanelRoot" Margin="0" RenderTransformOrigin="1,0.5">
    <Grid.RenderTransform><TranslateTransform x:Name="PanelTranslation"/></Grid.RenderTransform>
-   <Grid.ColumnDefinitions><ColumnDefinition Width="1*"/><ColumnDefinition Width="0"/><ColumnDefinition Width="1*"/><ColumnDefinition Width="0"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
+   <Grid.ColumnDefinitions><ColumnDefinition Width="1*"/><ColumnDefinition Width="1*"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
    <Border Grid.Column="0" Style="{StaticResource GlassPanel}" AllowDrop="True" Tag="0" DragEnter="PanelDragEnter" DragOver="PanelDragEnter" DragLeave="PanelDragLeave" Drop="PanelDrop">
     <DockPanel><ScrollViewer DockPanel.Dock="Bottom" MaxHeight="460" VerticalScrollBarVisibility="Hidden" Margin="24,0,24,12"><StackPanel x:Name="LeftWidgetHost"/></ScrollViewer><Grid x:Name="AppsLibraryPanel" Margin="24"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
      <StackPanel Visibility="Collapsed"/>
@@ -47,7 +43,7 @@
     </Grid>
    </DockPanel></Border>
 
-   <Border Grid.Column="2" Style="{StaticResource GlassPanel}" AllowDrop="True" Tag="1" DragEnter="PanelDragEnter" DragOver="PanelDragEnter" DragLeave="PanelDragLeave" Drop="PanelDrop">
+   <Border Grid.Column="1" Style="{StaticResource GlassPanel}" AllowDrop="True" Tag="1" DragEnter="PanelDragEnter" DragOver="PanelDragEnter" DragLeave="PanelDragLeave" Drop="PanelDrop">
     <DockPanel><ScrollViewer DockPanel.Dock="Bottom" MaxHeight="460" VerticalScrollBarVisibility="Hidden" Margin="24,0,24,12"><StackPanel x:Name="MiddleWidgetHost"/></ScrollViewer><Grid x:Name="ProjectsLibraryPanel" Margin="24"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
      <StackPanel Visibility="Collapsed"/>
      <TextBox Tag="搜索项目、文档或脚本" Grid.Row="1" Text="{Binding ProjectsSearch, UpdateSourceTrigger=PropertyChanged}" ToolTip="搜索资料名称、路径或分组" Margin="0,22,0,10"/>
@@ -59,9 +55,8 @@
     </Grid>
    </DockPanel></Border>
 
-   <Border Grid.Column="4" Style="{StaticResource GlassPanel}">
+   <Border Grid.Column="2" Style="{StaticResource GlassPanel}">
     <Grid Margin="24"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-     <Grid Margin="0,0,0,22"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel Visibility="Collapsed"/><Button Grid.Column="1" Content="收起 ›" Click="CollapseClick" VerticalAlignment="Center" Padding="10,8"/></Grid>
      <TabControl Grid.Row="1" x:Name="HubTabs" SelectionChanged="HubTabChanged">
       <TabItem x:Name="StatusPluginTab" Header="状态"><ScrollViewer VerticalScrollBarVisibility="Hidden"><StackPanel Margin="0,0,4,0">
        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
@@ -75,34 +70,46 @@
        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
       </StackPanel></ScrollViewer></TabItem>
       <TabItem Header="管理"><Grid x:Name="ManagementContent"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-       <TextBox Tag="搜索全部入口" Text="{Binding ManagementSearch, UpdateSourceTrigger=PropertyChanged}" ToolTip="搜索全部应用与资料" Margin="0,0,0,10"/>
-       <Grid Grid.Row="1" Margin="0,0,0,10"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding SelectionText}" VerticalAlignment="Center" Style="{StaticResource Caption}"/><Button Grid.Column="1" Content="选择可见项" Click="SelectVisibleClick" Padding="10,6"/></Grid>
-       <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Hidden"><ItemsControl ItemsSource="{Binding ManagementView}"><ItemsControl.ItemTemplate><DataTemplate><Border Background="#12FFFFFF" CornerRadius="10" Padding="10" Margin="0,0,0,7"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions><CheckBox IsChecked="{Binding IsSelected}" Margin="0,0,10,0" VerticalAlignment="Center"/><Image Grid.Column="1" Source="{Binding Icon}" Width="28" Height="28" Margin="0,0,10,0"/><StackPanel Grid.Column="2"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/><TextBlock FontSize="11" Foreground="{StaticResource Muted}" Margin="0,4,0,0"><Run Text="{Binding ScreenName, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding Group, Mode=OneWay}"/></TextBlock></StackPanel></Grid></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
-       <StackPanel Grid.Row="3" Margin="0,12,0,0"><TextBox Tag="输入分组名，例如：开发、学习、比赛" x:Name="BatchGroupInput" ToolTip="输入分组名；留空表示未分组"/><Button Content="应用分组到所选入口" Click="BatchGroupClick" Margin="0,8,0,8"/><UniformGrid Columns="2"><Button Content="移到应用库" Tag="0" Click="BatchMoveClick" Margin="0,0,4,8"/><Button Content="移到资料库" Tag="1" Click="BatchMoveClick" Margin="4,0,0,8"/><Button Content="批量移除" Click="BatchRemoveClick" Margin="0,0,4,0"/><Button Content="取消选择" Click="ClearSelectionClick" Margin="4,0,0,0"/></UniformGrid></StackPanel>
+       <StackPanel><TextBlock Text="搜索已添加的应用与资料入口" Foreground="#233249" FontWeight="SemiBold" Margin="0,0,0,6"/><TextBox Tag="搜索全部入口" Text="{Binding ManagementSearch, UpdateSourceTrigger=PropertyChanged}" ToolTip="搜索全部应用与资料" Foreground="#233249" Background="#CFFFFFFF" Padding="8" Margin="0,0,0,10"/></StackPanel>
+       <Grid Grid.Row="1" Margin="0,0,0,10"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding SelectionText}" VerticalAlignment="Center" FontSize="12" Foreground="#455970"/><Button Grid.Column="1" Content="选择可见项" Click="SelectVisibleClick" Padding="10,6"/></Grid>
+       <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Hidden"><ItemsControl ItemsSource="{Binding ManagementView}"><ItemsControl.ItemTemplate><DataTemplate><Border Background="#CFFFFFFF" CornerRadius="10" Padding="10" Margin="0,0,0,7"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions><CheckBox IsChecked="{Binding IsSelected}" Margin="0,0,10,0" VerticalAlignment="Center"/><Image Grid.Column="1" Source="{Binding Icon}" Width="28" Height="28" Margin="0,0,10,0"/><StackPanel Grid.Column="2"><TextBlock Text="{Binding Name}" Foreground="#233249" TextTrimming="CharacterEllipsis"/><TextBlock FontSize="11" Foreground="#455970" Margin="0,4,0,0"><Run Text="{Binding ScreenName, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding Group, Mode=OneWay}"/></TextBlock></StackPanel></Grid></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
+       <StackPanel Grid.Row="3" Margin="0,12,0,0"><TextBlock Text="批量分组" Foreground="#233249" Margin="0,0,0,6"/><TextBox Foreground="#233249" Background="#CFFFFFFF" Padding="8" Tag="输入分组名，例如：开发、学习、比赛" x:Name="BatchGroupInput" ToolTip="输入分组名；留空表示未分组"/><Button Content="应用分组到所选入口" Click="BatchGroupClick" Margin="0,8,0,8"/><UniformGrid Columns="2"><Button Content="移到应用库" Tag="0" Click="BatchMoveClick" Margin="0,0,4,8"/><Button Content="移到资料库" Tag="1" Click="BatchMoveClick" Margin="4,0,0,8"/><Button Content="批量移除" Click="BatchRemoveClick" Margin="0,0,4,0"/><Button Content="取消选择" Click="ClearSelectionClick" Margin="4,0,0,0"/></UniformGrid></StackPanel>
       </Grid></TabItem>
-      <TabItem x:Name="ControlPluginTab" Header="控制"><ScrollViewer x:Name="ControlsContent" VerticalScrollBarVisibility="Hidden"><StackPanel Margin="0,0,4,0">
+      <TabItem x:Name="ControlPluginTab" Header="控制"><ScrollViewer x:Name="ControlsContent" VerticalScrollBarVisibility="Hidden">
+       <ScrollViewer.Resources>
+        <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+         <Setter Property="Foreground" Value="#182B3D"/>
+         <Setter Property="Effect"><Setter.Value><DropShadowEffect Color="White" ShadowDepth="0" BlurRadius="4" Opacity="0.9"/></Setter.Value></Setter>
+        </Style>
+        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+         <Setter Property="Foreground" Value="#182B3D"/>
+         <Setter Property="Background" Value="#A6FFFFFF"/>
+         <Setter Property="BorderBrush" Value="#708696A6"/>
+        </Style>
+       </ScrollViewer.Resources>
+       <StackPanel Margin="0,0,4,0">
        <TextBlock Text="系统快捷设置" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,12"/>
        <UniformGrid Columns="3">
-        <Button Tag="ms-settings:network-wifi" Click="SystemSettingsClick" Margin="0,0,6,8" Padding="4,14"><StackPanel><TextBlock Text="&#xE701;" FontFamily="Segoe MDL2 Assets" FontSize="23" HorizontalAlignment="Center"/><TextBlock Text="Wi-Fi" Margin="0,10,0,0" HorizontalAlignment="Center"/><TextBlock Text="管理设备" FontSize="9" Foreground="{StaticResource Muted}" HorizontalAlignment="Center"/></StackPanel></Button>
-        <Button Tag="ms-settings:bluetooth" Click="SystemSettingsClick" Margin="0,0,6,8" Padding="4,14"><StackPanel><TextBlock Text="&#xE702;" FontFamily="Segoe MDL2 Assets" FontSize="23" HorizontalAlignment="Center"/><TextBlock Text="蓝牙" Margin="0,10,0,0" HorizontalAlignment="Center"/><TextBlock Text="管理设备" FontSize="9" Foreground="{StaticResource Muted}" HorizontalAlignment="Center"/></StackPanel></Button>
-        <Button Tag="ms-settings:network-airplanemode" Click="SystemSettingsClick" Margin="0,0,0,8" Padding="4,14"><StackPanel><TextBlock Text="&#xE709;" FontFamily="Segoe MDL2 Assets" FontSize="23" HorizontalAlignment="Center"/><TextBlock Text="飞行模式" Margin="0,10,0,0" HorizontalAlignment="Center"/><TextBlock Text="打开设置" FontSize="9" Foreground="{StaticResource Muted}" HorizontalAlignment="Center"/></StackPanel></Button>
-        <Button Tag="ms-settings:easeofaccess" Click="SystemSettingsClick" Content="辅助功能 ↗" Margin="0,0,6,8" Padding="4,12"/>
-        <Button Tag="ms-settings:powersleep" Click="SystemSettingsClick" Content="电源与节能 ↗" Margin="0,0,6,8" Padding="4,12"/>
-        <Button Tag="ms-settings:easeofaccess-closedcaptioning" Click="SystemSettingsClick" Content="字幕设置 ↗" Margin="0,0,0,8" Padding="4,12"/>
+        <Button Tag="ms-settings:network-wifi" Click="SystemSettingsClick" Margin="0,0,6,8" Padding="4,14"><StackPanel><TextBlock Text="&#xE701;" FontFamily="Segoe MDL2 Assets" FontSize="23" HorizontalAlignment="Center"/><TextBlock Text="Wi-Fi" Margin="0,10,0,0" HorizontalAlignment="Center"/><TextBlock Text="管理设备" FontSize="9" Foreground="#31475A" HorizontalAlignment="Center"/></StackPanel></Button>
+        <Button Tag="ms-settings:bluetooth" Click="SystemSettingsClick" Margin="0,0,6,8" Padding="4,14"><StackPanel><TextBlock Text="&#xE702;" FontFamily="Segoe MDL2 Assets" FontSize="23" HorizontalAlignment="Center"/><TextBlock Text="蓝牙" Margin="0,10,0,0" HorizontalAlignment="Center"/><TextBlock Text="管理设备" FontSize="9" Foreground="#31475A" HorizontalAlignment="Center"/></StackPanel></Button>
+        <Button Tag="ms-settings:network-airplanemode" Click="SystemSettingsClick" Margin="0,0,0,8" Padding="4,14"><StackPanel><TextBlock Text="&#xE709;" FontFamily="Segoe MDL2 Assets" FontSize="23" HorizontalAlignment="Center"/><TextBlock Text="飞行模式" Margin="0,10,0,0" HorizontalAlignment="Center"/><TextBlock Text="打开设置" FontSize="9" Foreground="#31475A" HorizontalAlignment="Center"/></StackPanel></Button>
+        <Button Tag="ms-settings:easeofaccess" Click="SystemSettingsClick" Margin="0,0,6,8" Padding="4,12"><TextBlock Text="辅助功能 ↗" Foreground="#182B3D"/></Button>
+        <Button Tag="ms-settings:powersleep" Click="SystemSettingsClick" Margin="0,0,6,8" Padding="4,12"><TextBlock Text="电源与节能 ↗" Foreground="#182B3D"/></Button>
+        <Button Tag="ms-settings:easeofaccess-closedcaptioning" Click="SystemSettingsClick" Margin="0,0,0,8" Padding="4,12"><TextBlock Text="字幕设置 ↗" Foreground="#182B3D"/></Button>
        </UniformGrid>
-       <Border Background="#12FFFFFF" CornerRadius="14" Padding="16" Margin="0,12,0,12"><StackPanel>
+       <Border Background="#A6FFFFFF" CornerRadius="14" Padding="16" Margin="0,12,0,12"><StackPanel>
         <Grid><TextBlock Text="系统音量"/><TextBlock x:Name="VolumeLabel" HorizontalAlignment="Right" Text="读取中"/></Grid><Slider x:Name="VolumeSlider" Minimum="0" Maximum="100" ValueChanged="VolumeChanged" IsEnabled="False" Margin="0,12,0,8"/>
-        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button x:Name="MuteButton" Content="静音" Click="MuteClick" IsEnabled="False" Padding="10,6"/><Button Grid.Column="1" Content="声音设置 ↗" Tag="ms-settings:sound" Click="SystemSettingsClick" Padding="10,6" Margin="8,0,0,0"/></Grid>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button x:Name="MuteButton" Click="MuteClick" IsEnabled="False" Padding="10,6" Content="静音"><Button.ContentTemplate><DataTemplate><TextBlock Text="{Binding}" Foreground="#182B3D"/></DataTemplate></Button.ContentTemplate></Button><Button Grid.Column="1" Tag="ms-settings:sound" Click="SystemSettingsClick" Padding="10,6" Margin="8,0,0,0"><TextBlock Text="声音设置 ↗" Foreground="#182B3D"/></Button></Grid>
        </StackPanel></Border>
-       <Border Background="#12FFFFFF" CornerRadius="14" Padding="16" Margin="0,0,0,16"><StackPanel><Grid><TextBlock Text="屏幕亮度"/><TextBlock x:Name="BrightnessLabel" HorizontalAlignment="Right" Text="读取中" FontSize="12"/></Grid><Slider x:Name="BrightnessSlider" ValueChanged="BrightnessChanged" Minimum="0" Maximum="100" IsEnabled="False" PreviewMouseLeftButtonUp="BrightnessReleased" PreviewKeyUp="BrightnessKeyUp" Margin="0,12,0,8"/><Button Content="显示设置 ↗" Tag="ms-settings:display" Click="SystemSettingsClick" Padding="10,6"/></StackPanel></Border>
-       <UniformGrid Columns="2"><Button Content="{Binding AwakeLabel}" Click="AwakeClick" Margin="0,0,6,8"/><Button Content="清空回收站" Click="RecycleClick" Margin="0,0,0,8"/><Button Content="任务栏与托盘 ↗" Tag="ms-settings:taskbar" Click="SystemSettingsClick" Margin="0,0,6,8"/><Button Content="桌面个性化 ↗" Tag="ms-settings:personalization" Click="SystemSettingsClick" Margin="0,0,0,8"/></UniformGrid>
-       <Border Background="#12FFFFFF" CornerRadius="14" Padding="16" Margin="0,12,0,0"><StackPanel><TextBlock Text="{Binding ClockText}" FontSize="36"/><TextBlock Text="{Binding DateText}" Margin="0,6,0,8"/><TextBlock Text="{Binding BatteryText}" Foreground="{StaticResource Accent}"/></StackPanel></Border>
+       <Border Background="#A6FFFFFF" CornerRadius="14" Padding="16" Margin="0,0,0,16"><StackPanel><Grid><TextBlock Text="屏幕亮度"/><TextBlock x:Name="BrightnessLabel" HorizontalAlignment="Right" Text="读取中" FontSize="12"/></Grid><Slider x:Name="BrightnessSlider" ValueChanged="BrightnessChanged" Minimum="0" Maximum="100" IsEnabled="False" PreviewMouseLeftButtonUp="BrightnessReleased" PreviewKeyUp="BrightnessKeyUp" Margin="0,12,0,8"/><Button Tag="ms-settings:display" Click="SystemSettingsClick" Padding="10,6"><TextBlock Text="显示设置 ↗" Foreground="#182B3D"/></Button></StackPanel></Border>
+       <UniformGrid Columns="2"><Button Click="AwakeClick" Margin="0,0,6,8"><TextBlock Text="{Binding AwakeLabel}" Foreground="#182B3D"/></Button><Button Click="RecycleClick" Margin="0,0,0,8"><TextBlock Text="清空回收站" Foreground="#182B3D"/></Button><Button Tag="ms-settings:taskbar" Click="SystemSettingsClick" Margin="0,0,6,8"><TextBlock Text="任务栏与托盘 ↗" Foreground="#182B3D"/></Button><Button Tag="ms-settings:personalization" Click="SystemSettingsClick" Margin="0,0,0,8"><TextBlock Text="桌面个性化 ↗" Foreground="#182B3D"/></Button></UniformGrid>
+       <Border Background="#A6FFFFFF" CornerRadius="14" Padding="16" Margin="0,12,0,0"><StackPanel><TextBlock Text="{Binding ClockText}" FontSize="36"/><TextBlock Text="{Binding DateText}" Margin="0,6,0,8"/><TextBlock Text="{Binding BatteryText}" Foreground="#175D79"/></StackPanel></Border>
       </StackPanel></ScrollViewer></TabItem>
      <TabItem Header="桌面插件"><ScrollViewer VerticalScrollBarVisibility="Hidden"><StackPanel x:Name="RightWidgetHost" Margin="0,8,4,0"/></ScrollViewer></TabItem></TabControl>
      <Grid Grid.Row="2" Margin="0,18,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button Grid.Column="1" Content="＋ 插件库" Click="PluginLibraryClick" Padding="10,7"/></Grid>
     </Grid>
    </Border>
-   <Canvas x:Name="WidgetCanvas" Grid.ColumnSpan="5" Margin="0" ClipToBounds="True"/>
+   <Canvas x:Name="WidgetCanvas" Grid.ColumnSpan="3" Margin="0" ClipToBounds="True"/>
 
   </Grid>
  </Grid>

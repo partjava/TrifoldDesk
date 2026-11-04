@@ -1,0 +1,13 @@
+TrifoldDesk adapts the LensOffset profile from GlassDesk 1.4.0
+(Copyright 2026 everlosttime and GlassDesk contributors), originally adapted
+from Kyant0/AndroidLiquidGlass (Copyright 2025 Kyant).
+Original source commit: 65ab177e90e5c1d8c62e70cf7755841982da65f6.
+
+The lens profile is Apache-2.0. The bundled LICENSE contains the license text.
+TrifoldDesk applies the profile with its own rounded-rectangle sampling and blur.
+
+The Launchpad also adapts GlassDesk 1.4.0 AndroidLiquidGlassRenderer,
+GlassSignedDistance, LiquidGlassDispersionParameters, SquircleGlassGeometry,
+and ContinuousGlassGeometry. These historical source files are Apache-2.0.
+TrifoldDesk changes their namespaces and supplies its own desktop capture,
+tint, and resolution budget.

@@ -4,7 +4,7 @@ namespace TrifoldDesk;
 // Pure visual samples: no widget lifecycle, timers, services, file paths or commands.
 internal static class PluginPreview
 {
-    private static readonly Brush Accent = Fill("#74E1D1");
+    private static readonly Brush Accent = Fill("#227E77");
     internal static SolidColorBrush Fill(string color) => new((Color)ColorConverter.ConvertFromString(color));
     internal static FrameworkElement Create(string id)
     {
@@ -19,12 +19,12 @@ internal static class PluginPreview
             "project-browser" => SampleLines("▸ 我的项目", "  ▸ src", "  README.md", "Git · main · 2 项变更"),
             _ => Label("预览", 14)
         };
-        root.Children.Add(new Border { Background = Fill("#192731"), CornerRadius = new CornerRadius(7), Padding = new Thickness(10, 7, 10, 7), Child = content });
-        var caption = Label("示例数据", 10, "#B8C9D2"); caption.Margin = new Thickness(0, 5, 0, 0); caption.HorizontalAlignment = HorizontalAlignment.Right;
+        root.Children.Add(new Border { Background = Fill("#E6EEF3"), CornerRadius = new CornerRadius(7), Padding = new Thickness(10, 7, 10, 7), Child = content });
+        var caption = Label("示例数据", 10, "#455970"); caption.Margin = new Thickness(0, 5, 0, 0); caption.HorizontalAlignment = HorizontalAlignment.Right;
         Grid.SetRow(caption, 1); root.Children.Add(caption); return root;
     }
     private static FrameworkElement SampleLines(params string[] lines){var stack=new StackPanel();foreach(var line in lines)stack.Children.Add(Label(line,14));return stack;}
-    private static TextBlock Label(string text, double size, string color = "#F0F7FA") => new()
+    private static TextBlock Label(string text, double size, string color = "#233249") => new()
     {
         Text = text, FontSize = size, Foreground = Fill(color), VerticalAlignment = VerticalAlignment.Center,
         TextTrimming = TextTrimming.CharacterEllipsis
@@ -43,7 +43,7 @@ internal static class PluginPreview
         var stack = new StackPanel { Margin = new Thickness(4, 1, 8, 4) };
         var header = new DockPanel();
         var glyph = new HardwareGlyph { Kind = kind, Width = 15, Height = 15, Ink = Accent }; DockPanel.SetDock(glyph, Dock.Right); header.Children.Add(glyph);
-        header.Children.Add(Label(name, 9, "#A8BDC8")); stack.Children.Add(header); stack.Children.Add(Label(value, kind == "network" ? 13 : 19));
+        header.Children.Add(Label(name, 9, "#40576D")); stack.Children.Add(header); stack.Children.Add(Label(value, kind == "network" ? 13 : 19));
         if (kind == "memory") { var gauge = new CapacityGauge { Height = 5, Segmented = true, Accent = Accent }; gauge.UpdateValue(amount); stack.Children.Add(gauge); }
         else
         {
@@ -58,7 +58,7 @@ internal static class PluginPreview
         var icons = new UniformGrid { Columns = 3, Rows = 2, Margin = new Thickness(4) };
         string[] names = ["浏览器", "终端", "编辑器", "文档", "图片", "工具"];
         string[] symbols = ["◎", ">_", "{ }", "▤", "▧", "⚙"];
-        string[] colors = ["#66B9EC", "#74E1D1", "#B395FF", "#F3CB7A", "#EEA4BE", "#9ABBCB"];
+        string[] colors = ["#2878A5", "#227E77", "#7452A0", "#8F631C", "#A44E71", "#4C7187"];
         for (int i = 0; i < names.Length; i++)
         {
             var item = new StackPanel { Margin = new Thickness(3, 0, 3, 3) };
@@ -73,11 +73,11 @@ internal static class PluginPreview
         var title = Label("2026年10月", 11); title.HorizontalAlignment = HorizontalAlignment.Center; stack.Children.Add(title);
         var days = new UniformGrid { Columns = 7, Rows = 7, Height = 90, Margin = new Thickness(0, 4, 0, 0) };
         foreach (string day in new[] { "一", "二", "三", "四", "五", "六", "日" })
-        { var label = Label(day, 9, day is "六" or "日" ? "#D28B91" : "#A6ABB5"); label.HorizontalAlignment = HorizontalAlignment.Center; days.Children.Add(label); }
+        { var label = Label(day, 9, day is "六" or "日" ? "#9B3F50" : "#46566C"); label.HorizontalAlignment = HorizontalAlignment.Center; days.Children.Add(label); }
         var sampleDate = new DateTime(2026, 10, 6);
         foreach (var day in CalendarMonth.Days(sampleDate))
         {
-            var label = Label(day.Date.Day.ToString(), 9, day.Date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? "#D28B91" : "#D7DBE2");
+            var label = Label(day.Date.Day.ToString(), 9, day.Date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? "#9B3F50" : "#26343F");
             label.HorizontalAlignment = HorizontalAlignment.Center;
             days.Children.Add(new Border { CornerRadius = new CornerRadius(2), Background = day.Date == sampleDate ? Fill("#50288095") : Brushes.Transparent, Opacity = day.InMonth ? 1 : .25, Child = label });
         }
@@ -86,8 +86,8 @@ internal static class PluginPreview
     private static FrameworkElement Clock()
     {
         var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
-        stack.Children.Add(Label("10:08", 42)); stack.Children.Add(Label("10月6日  星期二", 11, "#A8BDC8"));
-        stack.Children.Add(Label(CalendarMonth.LunarText(new DateTime(2026, 10, 6)), 10, "#A8BDC8")); return stack;
+        stack.Children.Add(Label("10:08", 42)); stack.Children.Add(Label("10月6日  星期二", 11, "#40576D"));
+        stack.Children.Add(Label(CalendarMonth.LunarText(new DateTime(2026, 10, 6)), 10, "#40576D")); return stack;
     }
     private static FrameworkElement Controls()
     {
@@ -96,12 +96,12 @@ internal static class PluginPreview
         {
             var row = new Grid { Margin = new Thickness(0, 0, 0, 12) };
             row.ColumnDefinitions.Add(new() { Width = new GridLength(42) }); row.ColumnDefinitions.Add(new());
-            row.Children.Add(Label(name, 11, "#A8BDC8"));
+            row.Children.Add(Label(name, 11, "#40576D"));
             var gauge = new CapacityGauge { Height = 5, Accent = Accent, VerticalAlignment = VerticalAlignment.Center }; gauge.UpdateValue(amount);
             Grid.SetColumn(gauge, 1); row.Children.Add(gauge); stack.Children.Add(row);
         }
         var actions = new UniformGrid { Columns = 2 };
-        foreach (string name in new[] { "常亮", "设置" }) actions.Children.Add(new Border { Background = Fill("#12FFFFFF"), CornerRadius = new CornerRadius(5), Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 6, 0), Child = Label(name, 11) });
+        foreach (string name in new[] { "常亮", "设置" }) actions.Children.Add(new Border { Background = Fill("#C9D9E5"), CornerRadius = new CornerRadius(5), Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 6, 0), Child = Label(name, 11) });
         stack.Children.Add(actions); return stack;
     }
     private static FrameworkElement PhotoLine()
@@ -127,4 +127,3 @@ internal static class PluginPreview
         return grid;
     }
 }
-
