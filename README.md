@@ -2,6 +2,8 @@
 
 Windows 桌面整理工具：用左、中、右三个可独立折叠的页面，放置应用、文件夹和按需添加的小部件。
 
+**第三方授权（仅玻璃渲染）** · [Apache-2.0 许可证](src/TrifoldDesk.App/ThirdParty/DockGlass/LICENSE) · [来源与署名](src/TrifoldDesk.App/ThirdParty/DockGlass/NOTICE)
+
 ![TrifoldDesk 桌面效果](home.png)
 
 ## 功能
