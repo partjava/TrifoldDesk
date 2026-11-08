@@ -12,6 +12,11 @@ namespace TrifoldDesk.Services;
 internal static class DockGlassRenderer
 {
     private static readonly object CaptureGate = new();
+    private static Drawing.Bitmap? _widgetFrame;
+    private static Drawing.Rectangle _widgetFrameBounds;
+    private static nint _widgetFrameOwner;
+    private static int _widgetFrameRevision;
+    private static long _widgetFrameExpiresAt;
     private const uint ExcludeFromCapture = 0x11;
     private const uint PreviousWindow = 3;
     private static readonly uint ProcessId = (uint)Environment.ProcessId;
@@ -36,8 +41,10 @@ internal static class DockGlassRenderer
     private static extern bool BitBlt(nint destination, int x, int y, int width, int height,
         nint source, int sourceX, int sourceY, uint operation);
 
-    public static BitmapSource? Render(nint window, Drawing.Rectangle area, double radius, double scale, bool launchpad = false, bool lighterPanel = false)
+    public static BitmapSource? Render(nint window, Drawing.Rectangle area, double radius, double scale,
+        bool launchpad = false, bool lighterPanel = false, Drawing.Rectangle? widgetHostBounds = null)
     {
+        if (!GlassCapturePolicy.Enabled) return null;
         const double lensStrength = 3;
         int step = Math.Max(1, (int)Math.Round(2 * scale));
         int padding = launchpad ? 0 : step + (int)Math.Ceiling(lensStrength * scale) + 1;
@@ -49,7 +56,15 @@ internal static class DockGlassRenderer
         using var bitmap = new Drawing.Bitmap(capture.Width, capture.Height, DrawingPixelFormat.Format32bppRgb);
         lock (CaptureGate)
         {
-            if (!CaptureDesktop(window, bitmap, capture, visible)) return null;
+            var source = GlassCapturePolicy.Source;
+            if (source == GlassCaptureSource.Disabled) return null;
+            var shared = widgetHostBounds is { } host
+                ? Drawing.Rectangle.Intersect(host, System.Windows.Forms.SystemInformation.VirtualScreen)
+                : Drawing.Rectangle.Empty;
+            bool captured = source == GlassCaptureSource.ScreenComposite && shared.Contains(visible)
+                ? CopySharedWidgetFrame(window, bitmap, capture, visible, shared)
+                : CaptureBackdrop(source, window, bitmap, capture, visible);
+            if (!captured) return null;
         }
         if (launchpad)
             return RenderPanel(bitmap, radius / scale, scale, lighterPanel);
@@ -120,9 +135,53 @@ internal static class DockGlassRenderer
         frame.Freeze();
         return frame;
     }
-    private static bool CaptureDesktop(nint window, Drawing.Bitmap bitmap, Drawing.Rectangle capture, Drawing.Rectangle visible)
+    private static bool CaptureBackdrop(GlassCaptureSource source, nint window, Drawing.Bitmap bitmap,
+        Drawing.Rectangle capture, Drawing.Rectangle visible) => source switch
     {
-        if (window == 0) return false;
+        GlassCaptureSource.DesktopOnly => DesktopGlassBackdrop.TryCapture(bitmap, capture, visible),
+        GlassCaptureSource.ScreenComposite => CaptureComposite(window, bitmap, capture, visible),
+        _ => false
+    };
+
+    // Widgets in the same desktop window can crop the same capture without excluding
+    // their shared HWND once per card. This cache is only accessed inside CaptureGate.
+    private static bool CopySharedWidgetFrame(nint window, Drawing.Bitmap bitmap, Drawing.Rectangle capture,
+        Drawing.Rectangle visible, Drawing.Rectangle shared)
+    {
+        int revision = GlassCapturePolicy.Revision;
+        if (_widgetFrameOwner != window || _widgetFrameBounds != shared ||
+            _widgetFrameRevision != revision || Environment.TickCount64 >= _widgetFrameExpiresAt)
+        {
+            _widgetFrame?.Dispose();
+            _widgetFrame = null;
+            _widgetFrameOwner = window;
+            _widgetFrameBounds = shared;
+            _widgetFrameRevision = revision;
+            var frame = new Drawing.Bitmap(shared.Width, shared.Height, DrawingPixelFormat.Format32bppRgb);
+            try
+            {
+                if (GlassCapturePolicy.Source == GlassCaptureSource.ScreenComposite &&
+                    CaptureComposite(window, frame, shared, shared))
+                    _widgetFrame = frame;
+            }
+            finally
+            {
+                if (_widgetFrame != frame) frame.Dispose();
+                _widgetFrameExpiresAt = Environment.TickCount64 + 250;
+            }
+        }
+        if (_widgetFrame is null) return false;
+
+        using var graphics = Drawing.Graphics.FromImage(bitmap);
+        var input = new Drawing.Rectangle(visible.X - shared.X, visible.Y - shared.Y, visible.Width, visible.Height);
+        var output = new Drawing.Rectangle(visible.X - capture.X, visible.Y - capture.Y, visible.Width, visible.Height);
+        graphics.DrawImage(_widgetFrame, output, input, Drawing.GraphicsUnit.Pixel);
+        return true;
+    }
+
+    private static bool CaptureComposite(nint window, Drawing.Bitmap bitmap, Drawing.Rectangle capture, Drawing.Rectangle visible)
+    {
+        if (window == 0 || GlassCapturePolicy.Source != GlassCaptureSource.ScreenComposite) return false;
         var exclusions = new List<(nint Window, uint Affinity)>();
 
         bool Exclude(nint hwnd)

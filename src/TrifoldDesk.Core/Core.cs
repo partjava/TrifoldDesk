@@ -20,10 +20,18 @@ public sealed class ShortcutItem
     public bool RunAsAdmin { get; set; }
 }
 public sealed class ShortcutConfig { public int SchemaVersion { get; set; } = 2; public List<ShortcutItem> Items { get; set; } = []; }
+public enum GlassBackdropMode
+{
+    ScreenComposite,
+    DesktopOnly
+}
+
 public sealed class AppSettings
 {
     public int SchemaVersion { get; set; } = 2;
     public double GlassOpacity { get; set; } = 0.14;
+    public GlassBackdropMode GlassBackdropMode { get; set; } = GlassBackdropMode.ScreenComposite;
+    public bool RemoteGlassCompatibility { get; set; }
     public bool IsCollapsed { get; set; }
     public bool HoverExpand { get; set; }
     public bool AutoCollapse { get; set; }

@@ -7,10 +7,20 @@ public partial class SettingsWindow : Window
     private readonly AppSettings _original;
     public AppSettings Result { get; private set; } = new();
     private sealed record Choice(string Id, string Name);
+    private sealed record GlassChoice(GlassBackdropMode Mode, string Name);
     public SettingsWindow(AppSettings settings)
     {
         InitializeComponent(); _original = settings;
         OpacitySlider.Value = settings.GlassOpacity;
+        GlassBackdropCombo.ItemsSource = new GlassChoice[]
+        {
+            new(GlassBackdropMode.ScreenComposite, "当前屏幕画面"),
+            new(GlassBackdropMode.DesktopOnly, "仅桌面背景")
+        };
+        GlassBackdropCombo.SelectedValue = Enum.IsDefined(settings.GlassBackdropMode)
+            ? settings.GlassBackdropMode
+            : GlassBackdropMode.ScreenComposite;
+        RemoteGlassCheck.IsChecked = settings.RemoteGlassCompatibility;
         IdleCheck.IsChecked = settings.TransparentIdle;
         DesktopCheck.IsChecked=settings.DesktopEmbedded;
         AnimationCheck.IsChecked = settings.AnimationsEnabled; StartupCheck.IsChecked = settings.StartWithWindows;
@@ -40,6 +50,9 @@ public partial class SettingsWindow : Window
             DesktopEmbedded=DesktopCheck.IsChecked==true,
             SelectedGpuId=GpuCombo.SelectedValue as string ?? "", SensorEnabled=_original.SensorEnabled,
             GlassOpacity = OpacitySlider.Value, IsCollapsed = _original.IsCollapsed,
+            GlassBackdropMode = GlassBackdropCombo.SelectedValue is GlassBackdropMode mode
+                ? mode : GlassBackdropMode.ScreenComposite,
+            RemoteGlassCompatibility = RemoteGlassCheck.IsChecked == true,
             TransparentIdle = IdleCheck.IsChecked == true, HoverExpand = false,
             AutoCollapse = false, AlwaysOnTop = false,
             AnimationsEnabled = AnimationCheck.IsChecked == true, StartWithWindows = StartupCheck.IsChecked == true,

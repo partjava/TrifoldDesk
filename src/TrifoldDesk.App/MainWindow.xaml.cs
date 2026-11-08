@@ -40,6 +40,7 @@ public partial class MainWindow : Window
         _config = new ConfigManager(App.DataDirectory);
         try { ConfigTransaction.Recover(App.DataDirectory); } catch(Exception ex) { App.Log(ex); _loadWarning="配置事务恢复失败："+ex.Message; }
         var settings = _config.Load<AppSettings>("settings.json"); _settings = settings.Value;
+        GlassCapturePolicy.Configure(_settings.GlassBackdropMode, _settings.RemoteGlassCompatibility);
         // Legacy panel preferences must not override permanent desktop behavior.
         _settings.AlwaysOnTop = false; _settings.AutoCollapse = false; _settings.HoverExpand = false; _settings.IsCollapsed = false;
         if(!App.IsSelfTest)_settings.StartWithWindows=SystemActionService.AutoStartRegistered();
@@ -254,6 +255,9 @@ public partial class MainWindow : Window
                     catch (Exception ex) { Fail("开机自启设置失败", ex); updated.StartWithWindows = _settings.StartWithWindows; }
                 }
                 _settings.GlassOpacity = updated.GlassOpacity; _settings.HoverExpand = updated.HoverExpand; _settings.AutoCollapse = updated.AutoCollapse;
+                _settings.GlassBackdropMode = updated.GlassBackdropMode;
+                _settings.RemoteGlassCompatibility = updated.RemoteGlassCompatibility;
+                GlassCapturePolicy.Configure(_settings.GlassBackdropMode, _settings.RemoteGlassCompatibility);
                 _settings.AlwaysOnTop = updated.AlwaysOnTop; _settings.AnimationsEnabled = updated.AnimationsEnabled; _settings.TransparentIdle = updated.TransparentIdle;
                 _settings.DesktopEmbedded=updated.DesktopEmbedded;ApplyDesktopHost();
                 _settings.SelectedGpuId=updated.SelectedGpuId; _settings.SensorEnabled=updated.SensorEnabled;

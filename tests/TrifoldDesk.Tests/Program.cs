@@ -24,6 +24,18 @@ try
     Directory.CreateDirectory(Path.Combine(root, "bad"));
     File.WriteAllText(Path.Combine(root, "bad", "settings.json"), "null");
     Check(other.Load<AppSettings>("settings.json").Warning != null, "JSON null is treated as corruption");
+    File.WriteAllText(Path.Combine(root, "settings.json"), """{"SchemaVersion":2,"GlassOpacity":0.3}""");
+    var legacyGlassSettings = store.Load<AppSettings>("settings.json");
+    Check(legacyGlassSettings.Warning is null && legacyGlassSettings.Value.GlassOpacity == 0.3
+        && legacyGlassSettings.Value.GlassBackdropMode == GlassBackdropMode.ScreenComposite
+        && !legacyGlassSettings.Value.RemoteGlassCompatibility, "older settings keep the existing glass source");
+    legacyGlassSettings.Value.GlassBackdropMode = GlassBackdropMode.DesktopOnly;
+    legacyGlassSettings.Value.RemoteGlassCompatibility = true;
+    store.Save("settings.json", legacyGlassSettings.Value);
+    var savedGlassSettings = store.Load<AppSettings>("settings.json");
+    Check(savedGlassSettings.Warning is null
+        && savedGlassSettings.Value.GlassBackdropMode == GlassBackdropMode.DesktopOnly
+        && savedGlassSettings.Value.RemoteGlassCompatibility, "glass backdrop and remote compatibility persist");
     Check(RateMath.BytesPerSecond(200, 100, 2) == 50, "network rate uses elapsed time");
     Check(RateMath.BytesPerSecond(10, 100, 2) == 0, "network counter reset is safe");
     Check(RateMath.BytesPerSecond(200, 100, 0) == 0, "zero elapsed time is safe");

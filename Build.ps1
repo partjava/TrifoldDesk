@@ -1,4 +1,4 @@
-param([switch]$Test, [string]$Version = '0.10.19')
+param([switch]$Test, [string]$Version = '0.10.20')
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $env:DOTNET_CLI_HOME = Join-Path $PSScriptRoot '.dotnet'

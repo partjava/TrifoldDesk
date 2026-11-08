@@ -18,7 +18,8 @@ internal static class WindowGlassRefresh
         bool closed = false;
         int revision = 0;
 
-        bool CanRefresh() => !closed && window.IsVisible && window.WindowState != WindowState.Minimized;
+        bool CanRefresh() => GlassCapturePolicy.Enabled && !closed && window.IsVisible &&
+            window.WindowState != WindowState.Minimized;
 
         void Schedule()
         {
@@ -59,11 +60,19 @@ internal static class WindowGlassRefresh
             }
         };
 
+        void OnCaptureChanged()
+        {
+            applyFrame(null);
+            Schedule();
+        }
+
+        GlassCapturePolicy.Changed += OnCaptureChanged;
         window.IsVisibleChanged += (_, _) => Schedule();
         window.StateChanged += (_, _) => Schedule();
         window.Closed += (_, _) =>
         {
             closed = true;
+            GlassCapturePolicy.Changed -= OnCaptureChanged;
             Schedule();
         };
     }

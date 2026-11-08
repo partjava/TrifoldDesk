@@ -30,6 +30,7 @@ public partial class MainWindow
         _folderWorkspaceHistory=null;
         var settings=_config.Load<AppSettings>("settings.json");
         foreach(var property in typeof(AppSettings).GetProperties().Where(p=>p.CanWrite))property.SetValue(_settings,property.GetValue(settings.Value));
+        GlassCapturePolicy.Configure(_settings.GlassBackdropMode, _settings.RemoteGlassCompatibility);
         _settings.AlwaysOnTop=false;_settings.AutoCollapse=false;_settings.HoverExpand=false;_settings.IsCollapsed=false;
         _settings.GlassOpacity=Math.Clamp(_settings.GlassOpacity,.05,.55);
         if(!App.IsSelfTest)_settings.StartWithWindows=SystemActionService.AutoStartRegistered();

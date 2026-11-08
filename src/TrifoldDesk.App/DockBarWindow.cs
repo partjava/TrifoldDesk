@@ -71,6 +71,7 @@ public sealed class DockBarWindow : Window
         Topmost = _config.AlwaysOnTop;
 
         _glassTimer.Tick += RefreshGlass;
+        GlassCapturePolicy.Changed += OnGlassCaptureChanged;
 
         BuildUI();
 
@@ -83,6 +84,7 @@ public sealed class DockBarWindow : Window
         Closed += (_, _) =>
         {
             SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
+            GlassCapturePolicy.Changed -= OnGlassCaptureChanged;
 
             _glassClosed = true;
             _glassTimer.Stop();
@@ -827,19 +829,25 @@ public sealed class DockBarWindow : Window
     private static SolidColorBrush GlassFallback { get; } =
         new(Color.FromArgb(20, 255, 255, 255));
 
+    private void OnGlassCaptureChanged()
+    {
+        _glass.Background = GlassFallback;
+        QueueGlassRefresh();
+    }
+
     private void QueueGlassRefresh()
     {
         _glassRevision++;
         _glassTimer.Stop();
         _glassTimer.Interval = TimeSpan.FromMilliseconds(250);
-        if (!_glassClosed && IsVisible && !_isSlidDown)
+        if (GlassCapturePolicy.Enabled && !_glassRendering && !_glassClosed && IsVisible && !_isSlidDown)
             _glassTimer.Start();
     }
 
     private async void RefreshGlass(object? sender, EventArgs e)
     {
         _glassTimer.Stop();
-        if (_glassRendering || _glassClosed || !IsVisible || _isSlidDown ||
+        if (!GlassCapturePolicy.Enabled || _glassRendering || _glassClosed || !IsVisible || _isSlidDown ||
             _glass.ActualWidth <= 0 || _glass.ActualHeight <= 0 ||
             PresentationSource.FromVisual(_glass) is null) return;
 
@@ -874,7 +882,7 @@ public sealed class DockBarWindow : Window
         finally
         {
             _glassRendering = false;
-            if (!_glassClosed && IsVisible && !_isSlidDown)
+            if (GlassCapturePolicy.Enabled && !_glassClosed && IsVisible && !_isSlidDown)
             {
                 _glassTimer.Interval = TimeSpan.FromMilliseconds(
                     revision == _glassRevision && _glass.Background is not ImageBrush ? 1000 : 250);

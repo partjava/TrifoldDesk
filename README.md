@@ -130,3 +130,10 @@ home.png                 桌面效果图
 ## 构建安装包
 
 安装 Inno Setup 6.7 或更新版本后，运行 BuildInstaller.ps1 -CompilerPath '你的 ISCC.exe 路径'。脚本发布 Windows x64 自包含程序，并编译 installer/TrifoldDesk.iss；需要访问官方 NuGet 包源。输出在 dist/installers。
+
+### 0.10.20：玻璃刷新与远控兼容
+
+- 组件玻璃刷新间隔统一为 250 毫秒，并合并同一窗口的背景采样。
+- 设置新增背景来源选择和手动远控兼容模式，设置随配置保存。
+- UU 远控时请手动开启兼容模式，暂停玻璃采样以避免捕获闪烁；尚未实现可靠的 UU 被控自动识别。
+- “仅桌面背景”为实验功能：部分 GPU 动态壁纸（包括当前测试的 Wallpaper Engine）无法提供有效画面，会使用备用底色；默认仍为“当前屏幕画面”。

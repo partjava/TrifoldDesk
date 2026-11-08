@@ -79,6 +79,19 @@
     </Border>
     <Border Style="{StaticResource Card}">
      <StackPanel>
+      <TextBlock Text="玻璃效果" Style="{StaticResource Section}"/>
+      <TextBlock Text="玻璃背景来源"/>
+      <ComboBox x:Name="GlassBackdropCombo" SelectedValuePath="Mode" ItemTemplate="{StaticResource SettingsChoice}"
+                AutomationProperties.Name="玻璃背景来源" Margin="0,6,0,6"/>
+      <TextBlock Text="仅桌面背景为实验功能，部分动态壁纸不支持，将显示备用底色。当前屏幕画面可能包含其他软件窗口。"
+                 Style="{StaticResource Hint}"/>
+      <CheckBox x:Name="RemoteGlassCheck"><TextBlock Text="手动开启远控兼容模式" Foreground="#233249"/></CheckBox>
+      <TextBlock Text="远端看到窗口闪烁时可打开。兼容模式暂停玻璃采样，改用半透明底色。"
+                 Style="{StaticResource Hint}"/>
+     </StackPanel>
+    </Border>
+    <Border Style="{StaticResource Card}">
+     <StackPanel>
       <TextBlock Text="桌面与启动" Style="{StaticResource Section}"/>
       <CheckBox x:Name="DesktopCheck"><TextBlock Text="附着桌面（不兼容时回退底层窗口）" Foreground="#233249"/></CheckBox>
       <CheckBox x:Name="StartupCheck"><TextBlock Text="开机登录后自动运行" Foreground="#233249"/></CheckBox>
