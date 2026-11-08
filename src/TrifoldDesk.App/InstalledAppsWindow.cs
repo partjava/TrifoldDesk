@@ -122,12 +122,11 @@ public sealed class InstalledAppsWindow : Window
         root.Children.Add(backdrop);
         root.Children.Add(glass);
         Content = root;
-        var fallbackFill = PanelGlass.Fallback;
         var fallbackRim = glass.BorderBrush;
         void ApplyGlassFrame(BitmapSource? frame)
         {
             backdrop.Background = frame is null ? null : new ImageBrush(frame);
-            glass.Background = frame is null ? fallbackFill : Brushes.Transparent;
+            glass.Background = frame is null ? PanelGlass.Fallback : Brushes.Transparent;
             glass.BorderBrush = frame is null ? fallbackRim : Brushes.Transparent;
         }
 

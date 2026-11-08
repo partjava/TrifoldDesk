@@ -7,7 +7,16 @@ namespace TrifoldDesk.Services;
 
 internal static class PanelGlass
 {
-    public static Brush Fallback { get; } = CreateFallback();
+    private static readonly Brush RecoveryFallback = CreateFallback();
+    private static readonly Brush RemoteFallback = CreateRemoteFallback();
+    public static Brush Fallback => GlassCapturePolicy.Enabled ? RecoveryFallback : RemoteFallback;
+
+    private static Brush CreateRemoteFallback()
+    {
+        var brush = new SolidColorBrush(Color.FromArgb(12, 255, 255, 255));
+        brush.Freeze();
+        return brush;
+    }
 
     private static Brush CreateFallback()
     {
@@ -47,7 +56,6 @@ internal static class PanelGlass
 
     public static void AttachWidget(Border surface)
     {
-        var fallback = Fallback;
         var layoutDelay = TimeSpan.FromMilliseconds(180);
         var frameDelay = TimeSpan.FromMilliseconds(250);
         var retryDelay = TimeSpan.FromSeconds(3);
@@ -108,7 +116,7 @@ internal static class PanelGlass
                 frame = await CaptureAsync(hwnd, bounds, surface.CornerRadius.TopLeft, scale, lighterPanel: true,
                     widgetHostBounds: ScreenBounds(window));
                 if (surface.IsLoaded && surface.IsVisible && capturedRevision == revision)
-                    surface.Background = frame is null ? fallback : new ImageBrush(frame) { Stretch = Stretch.Fill };
+                    surface.Background = frame is null ? Fallback : new ImageBrush(frame) { Stretch = Stretch.Fill };
             }
             finally
             {
@@ -120,7 +128,7 @@ internal static class PanelGlass
         };
         void OnCaptureChanged()
         {
-            surface.Background = fallback;
+            surface.Background = Fallback;
             Reset();
             Schedule();
         }
