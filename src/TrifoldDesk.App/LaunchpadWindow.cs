@@ -332,7 +332,7 @@ public sealed class LaunchpadWindow : Window
     }
 
     private static Brush LaunchpadFallbackTint { get; } =
-        new SolidColorBrush(Color.FromArgb(12, 240, 247, 255));
+        PanelGlass.Fallback;
 
     private static Brush LaunchpadFallbackRim { get; } = new LinearGradientBrush(
         Color.FromArgb(155, 255, 255, 255), Color.FromArgb(40, 24, 29, 38), 55);

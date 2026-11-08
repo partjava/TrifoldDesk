@@ -281,7 +281,7 @@ internal static class DockGlassRenderer
         var glass = new GlassOptics.AndroidLiquidGlassRenderer();
         var rendered = glass.Render(pixels, width, height, size, new Rect(size), radius,
             squircle: true, dark: false, strength: lighterPanel ? .68 : 1, tintOpacity: lighterPanel ? .035 : .08,
-            backgroundClarity: lighterPanel ? .67 : .56, launchpadOptics: true);
+            backgroundClarity: lighterPanel ? .71 : .62, launchpadOptics: true);
         var frame = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, rendered, stride);
         frame.Freeze();
         return frame;

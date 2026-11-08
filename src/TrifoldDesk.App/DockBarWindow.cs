@@ -826,8 +826,7 @@ public sealed class DockBarWindow : Window
         BeginAnimation(TopProperty, anim);
     }
 
-    private static SolidColorBrush GlassFallback { get; } =
-        new(Color.FromArgb(20, 255, 255, 255));
+    private static Brush GlassFallback { get; } = PanelGlass.Fallback;
 
     private void OnGlassCaptureChanged()
     {

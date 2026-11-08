@@ -43,6 +43,7 @@ internal static class GlassCapturePolicy
         if ((GlassCaptureSource)Interlocked.Exchange(ref _source, (int)next) != next)
         {
             Interlocked.Increment(ref _revision);
+            DesktopGlassBackdrop.Reset();
             Changed?.Invoke();
         }
     }

@@ -7,6 +7,16 @@ namespace TrifoldDesk.Services;
 
 internal static class PanelGlass
 {
+    public static Brush Fallback { get; } = CreateFallback();
+
+    private static Brush CreateFallback()
+    {
+        var brush = new LinearGradientBrush(Color.FromArgb(165, 231, 239, 247),
+            Color.FromArgb(150, 173, 188, 203), 90);
+        brush.Freeze();
+        return brush;
+    }
+
     public static Drawing.Rectangle ScreenBounds(FrameworkElement element)
     {
         var start = element.PointToScreen(new Point());
@@ -37,7 +47,7 @@ internal static class PanelGlass
 
     public static void AttachWidget(Border surface)
     {
-        var fallback = surface.Background;
+        var fallback = Fallback;
         var layoutDelay = TimeSpan.FromMilliseconds(180);
         var frameDelay = TimeSpan.FromMilliseconds(250);
         var retryDelay = TimeSpan.FromSeconds(3);
