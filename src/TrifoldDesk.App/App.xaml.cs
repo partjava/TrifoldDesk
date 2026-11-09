@@ -318,7 +318,16 @@ public partial class App : Application
             window.TestTogglePane(1); window.TestTogglePane(2); await Task.Delay(250);
             Check(!window.TestPaneFolded(0) && window.TestPaneFolded(1) && window.TestPaneFolded(2), "middle and right faces fold without folding left");
             window.ExportPreview(Path.Combine(DataDirectory,"independent-panes.png"));
-            window.TestTogglePane(1); window.TestTogglePane(2); await Task.Delay(250);
+            window.Reveal(); await Task.Delay(250);
+            Check(Enumerable.Range(0, 3).All(i => !window.TestPaneFolded(i)), "reveal opens independently folded faces");
+            for (int i = 0; i < 3; i++)
+            {
+                window.TestTogglePane(i); await Task.Delay(250);
+                Check(window.HandleIsVisible == (i == 2), "recovery handle appears after last individual fold");
+            }
+            window.Reveal(); await Task.Delay(250);
+            Check(window.IsVisible && !window.HandleIsVisible &&
+                Enumerable.Range(0, 3).All(i => !window.TestPaneFolded(i)), "reveal recovers all individually folded faces");
             var desktopMenu=window.ContextMenu; desktopMenu.PlacementTarget=window; desktopMenu.IsOpen=true; await Task.Delay(120); desktopMenu.UpdateLayout();
             var menuBitmap=new System.Windows.Media.Imaging.RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(desktopMenu.ActualWidth)),Math.Max(1,(int)Math.Ceiling(desktopMenu.ActualHeight)),96,96,PixelFormats.Pbgra32); menuBitmap.Render(desktopMenu);
             var menuEncoder=new System.Windows.Media.Imaging.PngBitmapEncoder(); menuEncoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(menuBitmap)); using(var menuFile=File.Create(Path.Combine(DataDirectory,"desktop-menu.png")))menuEncoder.Save(menuFile); desktopMenu.IsOpen=false;

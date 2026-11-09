@@ -40,7 +40,7 @@ public partial class MainWindow : Window
         _config = new ConfigManager(App.DataDirectory);
         try { ConfigTransaction.Recover(App.DataDirectory); } catch(Exception ex) { App.Log(ex); _loadWarning="配置事务恢复失败："+ex.Message; }
         var settings = _config.Load<AppSettings>("settings.json"); _settings = settings.Value;
-        GlassCapturePolicy.Configure(_settings.GlassBackdropMode, _settings.RemoteGlassCompatibility);
+        GlassCapturePolicy.Configure(_settings.GlassBackdropMode, _settings.RemoteGlassCompatibility, _settings.GlassClarity);
         // Legacy panel preferences must not override permanent desktop behavior.
         _settings.AlwaysOnTop = false; _settings.AutoCollapse = false; _settings.HoverExpand = false; _settings.IsCollapsed = false;
         if(!App.IsSelfTest)_settings.StartWithWindows=SystemActionService.AutoStartRegistered();
@@ -54,11 +54,11 @@ public partial class MainWindow : Window
         _dock = new DockBarWindow(_config);
         _launchpad = new LaunchpadWindow(item => _dock.PinItem(item));
         _dock.LaunchpadRequested += _launchpad.Toggle;
-        _handle.ToggleRequested += () => { if (_collapsed) Reveal(); else SetCollapsed(true); };
+        _handle.ToggleRequested += Reveal;
         _handle.RevealRequested += Reveal; _handle.SettingsRequested += OpenSettings; _handle.ExitRequested += Exit;
         _hoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
         _hoverTimer.Tick += (_, _) => { _hoverTimer.Stop(); if (_settings.HoverExpand && _handle.IsMouseOver && !_handle.MenuIsOpen) RevealPanel(false); };
-        _handle.Entered += () => { _idleTimer?.Stop(); if (_collapsed && _settings.HoverExpand) _hoverTimer.Start(); };
+        _handle.Entered += () => { _idleTimer?.Stop(); if (_handle.IsVisible && _settings.HoverExpand) _hoverTimer.Start(); };
         _handle.LeftHandle += () => { _hoverTimer.Stop(); _leftAt = DateTime.UtcNow; _idleTimer?.Start(); };
         _idleTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _idleTimer.Tick += IdleTick;
@@ -240,7 +240,8 @@ public partial class MainWindow : Window
     private void SettingsClick(object sender, RoutedEventArgs e) => OpenSettings();
     public void OpenSettings()
     {
-        if (_dialogOpen) return; Reveal(); _dialogOpen = true;
+        if (_dialogOpen) return;
+        _dialogOpen = true;
         try
         {
             var window = new SettingsWindow(_settings) { Owner = this, DiagnosticsReport=BuildDiagnosticsReport() };
@@ -257,7 +258,8 @@ public partial class MainWindow : Window
                 _settings.GlassOpacity = updated.GlassOpacity; _settings.HoverExpand = updated.HoverExpand; _settings.AutoCollapse = updated.AutoCollapse;
                 _settings.GlassBackdropMode = updated.GlassBackdropMode;
                 _settings.RemoteGlassCompatibility = updated.RemoteGlassCompatibility;
-                GlassCapturePolicy.Configure(_settings.GlassBackdropMode, _settings.RemoteGlassCompatibility);
+                _settings.GlassClarity = updated.GlassClarity;
+                GlassCapturePolicy.Configure(_settings.GlassBackdropMode, _settings.RemoteGlassCompatibility, _settings.GlassClarity);
                 _settings.AlwaysOnTop = updated.AlwaysOnTop; _settings.AnimationsEnabled = updated.AnimationsEnabled; _settings.TransparentIdle = updated.TransparentIdle;
                 _settings.DesktopEmbedded=updated.DesktopEmbedded;ApplyDesktopHost();
                 _settings.SelectedGpuId=updated.SelectedGpuId; _settings.SensorEnabled=updated.SensorEnabled;
@@ -274,6 +276,13 @@ public partial class MainWindow : Window
     {
         if (_closing) return;
         if (WindowState != WindowState.Normal) WindowState = WindowState.Normal;
+        if (_paneState.Folded.Any(folded => folded))
+        {
+            _paneState = new PaneState();
+            try { _config.Save("panes.json", _paneState); }
+            catch (Exception ex) { Fail("展开状态未保存", ex); }
+            UpdatePaneClip();
+        }
         SetCollapsed(false);
         if (userRequested) { if(_settings.AlwaysOnTop)Activate();else WindowDockService.KeepAtDesktop(this); WindowDockService.RaiseHandle(_handle); }
     }
@@ -281,8 +290,8 @@ public partial class MainWindow : Window
     {
         if (_foldStateInitialized && _collapsed == collapsed && _foldOverlay == null && IsVisible != collapsed) return;
         _foldStateInitialized = true;
-        _collapsed = collapsed; _settings.IsCollapsed = collapsed; _handle.SetCollapsed(collapsed);
-        _handle.Visibility = collapsed ? Visibility.Visible : Visibility.Hidden;
+        _collapsed = collapsed; _settings.IsCollapsed = collapsed;
+        UpdateRecoveryHandle();
         _monitor.SetCollapsed(collapsed); _hoverTimer.Stop();
         if (collapsed) { _idleTimer?.Stop(); _controlTimer?.Stop(); _paneLayer.Children.Clear(); }
         else { _viewModel.RefreshClock(); if (HasPlugin("controls") || HubTabs.SelectedIndex == 2) { RefreshAudio(); _controlTimer?.Start(); } _idleTimer?.Start(); }

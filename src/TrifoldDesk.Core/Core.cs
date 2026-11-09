@@ -30,6 +30,7 @@ public sealed class AppSettings
 {
     public int SchemaVersion { get; set; } = 2;
     public double GlassOpacity { get; set; } = 0.14;
+    public int GlassClarity { get; set; } = 50;
     public GlassBackdropMode GlassBackdropMode { get; set; } = GlassBackdropMode.ScreenComposite;
     public bool RemoteGlassCompatibility { get; set; }
     public bool IsCollapsed { get; set; }

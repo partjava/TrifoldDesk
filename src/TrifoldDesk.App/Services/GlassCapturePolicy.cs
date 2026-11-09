@@ -11,20 +11,24 @@ internal static class GlassCapturePolicy
     private const int RemoteControl = 0x2001;
     private static int _source = (int)GlassCaptureSource.ScreenComposite;
     private static int _revision;
+    private static int _clarity = 50;
     private static GlassBackdropMode _mode;
     private static bool _manualPause;
     private static DispatcherTimer? _sessionTimer;
 
     public static GlassCaptureSource Source => (GlassCaptureSource)Volatile.Read(ref _source);
     public static int Revision => Volatile.Read(ref _revision);
+    public static double Clarity => Volatile.Read(ref _clarity) / 100.0;
     public static bool Enabled => Source != GlassCaptureSource.Disabled;
     public static event Action? Changed;
 
-    public static void Configure(GlassBackdropMode mode, bool manualPause)
+    public static void Configure(GlassBackdropMode mode, bool manualPause, int clarity)
     {
         _mode = mode;
         _manualPause = manualPause;
-        UpdateSource();
+        clarity = Math.Clamp(clarity, 0, 100);
+        bool clarityChanged = Interlocked.Exchange(ref _clarity, clarity) != clarity;
+        UpdateSource(clarityChanged);
         if (_sessionTimer is not null) return;
 
         _sessionTimer = new DispatcherTimer(DispatcherPriority.Background)
@@ -35,15 +39,16 @@ internal static class GlassCapturePolicy
         _sessionTimer.Start();
     }
 
-    private static void UpdateSource()
+    private static void UpdateSource(bool clarityChanged = false)
     {
         bool remote = GetSystemMetrics(RemoteSession) != 0 || GetSystemMetrics(RemoteControl) != 0;
         var next = _manualPause || remote ? GlassCaptureSource.Disabled :
             _mode == GlassBackdropMode.DesktopOnly ? GlassCaptureSource.DesktopOnly : GlassCaptureSource.ScreenComposite;
-        if ((GlassCaptureSource)Interlocked.Exchange(ref _source, (int)next) != next)
+        bool sourceChanged = (GlassCaptureSource)Interlocked.Exchange(ref _source, (int)next) != next;
+        if (sourceChanged || clarityChanged)
         {
             Interlocked.Increment(ref _revision);
-            DesktopGlassBackdrop.Reset();
+            if (sourceChanged) DesktopGlassBackdrop.Reset();
             Changed?.Invoke();
         }
     }

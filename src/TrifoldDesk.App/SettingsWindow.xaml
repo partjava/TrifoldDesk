@@ -80,6 +80,14 @@
     <Border Style="{StaticResource Card}">
      <StackPanel>
       <TextBlock Text="玻璃效果" Style="{StaticResource Section}"/>
+      <TextBlock Text="玻璃透光度"/>
+      <DockPanel Margin="0,4,0,4">
+       <TextBlock DockPanel.Dock="Right" MinWidth="46" TextAlignment="Right"
+                  Text="{Binding Value, ElementName=ClaritySlider, StringFormat={}{0:0}%}"/>
+       <Slider x:Name="ClaritySlider" Minimum="0" Maximum="100" TickFrequency="1"
+               IsSnapToTickEnabled="True" AutomationProperties.Name="玻璃透光度"/>
+      </DockPanel>
+      <TextBlock Text="数值越高，背景越清晰，边缘折射越轻。保存后生效。" Style="{StaticResource Hint}"/>
       <TextBlock Text="玻璃背景来源"/>
       <ComboBox x:Name="GlassBackdropCombo" SelectedValuePath="Mode" ItemTemplate="{StaticResource SettingsChoice}"
                 AutomationProperties.Name="玻璃背景来源" Margin="0,6,0,6"/>

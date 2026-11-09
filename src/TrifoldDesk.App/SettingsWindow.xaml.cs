@@ -12,6 +12,7 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent(); _original = settings;
         OpacitySlider.Value = settings.GlassOpacity;
+        ClaritySlider.Value = Math.Clamp(settings.GlassClarity, 0, 100);
         GlassBackdropCombo.ItemsSource = new GlassChoice[]
         {
             new(GlassBackdropMode.ScreenComposite, "当前屏幕画面"),
@@ -53,6 +54,7 @@ public partial class SettingsWindow : Window
             GlassBackdropMode = GlassBackdropCombo.SelectedValue is GlassBackdropMode mode
                 ? mode : GlassBackdropMode.ScreenComposite,
             RemoteGlassCompatibility = RemoteGlassCheck.IsChecked == true,
+            GlassClarity = (int)ClaritySlider.Value,
             TransparentIdle = IdleCheck.IsChecked == true, HoverExpand = false,
             AutoCollapse = false, AlwaysOnTop = false,
             AnimationsEnabled = AnimationCheck.IsChecked == true, StartWithWindows = StartupCheck.IsChecked == true,

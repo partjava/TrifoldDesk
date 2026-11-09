@@ -2,6 +2,7 @@ using System.Windows.Input;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using TrifoldDesk.Services;
 namespace TrifoldDesk;
 public sealed class PaneState { public bool[] Folded { get; set; } = new bool[3]; }
 public partial class MainWindow
@@ -45,14 +46,19 @@ public partial class MainWindow
         if(Content is Grid root)
         {
             if(_foldOverlay!=null||!_paneState.Folded.Any(f=>f))root.Clip=null;
-            else if(_paneState.Folded.All(f=>f)&&!_paneBusy.Any(b=>b))
-            {
-                var strip=new GeometryGroup();
-                if(PanelRoot.ActualWidth>0&&height>0)strip.Children.Add(new RectangleGeometry(new Rect(Math.Max(0,PanelRoot.ActualWidth-16),0,Math.Min(16,PanelRoot.ActualWidth),height)));
-                root.Clip=strip;
-            }
             else root.Clip=layerClip;
         }
+        UpdateRecoveryHandle();
+    }
+    private void UpdateRecoveryHandle()
+    {
+        bool show = _collapsed || (_paneState.Folded.All(folded => folded) && !_paneBusy.Any(busy => busy));
+        if (!_foldStateInitialized) return;
+        _handle.SetCollapsed(show);
+        var visibility = show ? Visibility.Visible : Visibility.Hidden;
+        if (_handle.Visibility == visibility) return;
+        _handle.Visibility = visibility;
+        if (show) WindowDockService.RaiseHandle(_handle);
     }
     private void TogglePane(int index)
     {

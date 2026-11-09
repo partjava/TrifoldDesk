@@ -45,8 +45,9 @@ internal static class DockGlassRenderer
         bool launchpad = false, bool lighterPanel = false, Drawing.Rectangle? widgetHostBounds = null)
     {
         if (!GlassCapturePolicy.Enabled) return null;
-        const double lensStrength = 3;
-        int step = Math.Max(1, (int)Math.Round(2 * scale));
+        double clarity = GlassCapturePolicy.Clarity;
+        double lensStrength = 6 * (1 - clarity);
+        int step = (int)Math.Round(4 * (1 - clarity) * scale);
         int padding = launchpad ? 0 : step + (int)Math.Ceiling(lensStrength * scale) + 1;
         var capture = area;
         capture.Inflate(padding, padding);
@@ -67,7 +68,7 @@ internal static class DockGlassRenderer
             if (!captured) return null;
         }
         if (launchpad)
-            return RenderPanel(bitmap, radius / scale, scale, lighterPanel);
+            return RenderPanel(bitmap, radius / scale, scale, lighterPanel, clarity);
 
         int stride = capture.Width * 4;
         var pixels = new byte[stride * capture.Height];
@@ -243,7 +244,7 @@ internal static class DockGlassRenderer
         }
     }
 
-    private static BitmapSource? RenderPanel(Drawing.Bitmap capture, double radius, double scale, bool lighterPanel)
+    private static BitmapSource? RenderPanel(Drawing.Bitmap capture, double radius, double scale, bool lighterPanel, double clarity)
     {
         // GlassDesk limits the sampling map so the first frame stays responsive on high-DPI screens.
         double ratio = Math.Min(1, Math.Sqrt(650_000.0 / ((double)capture.Width * capture.Height)));
@@ -279,9 +280,13 @@ internal static class DockGlassRenderer
 
         var size = new Size(capture.Width / scale, capture.Height / scale);
         var glass = new GlassOptics.AndroidLiquidGlassRenderer();
+        double normalClarity = lighterPanel ? .71 : .62;
+        double backgroundClarity = clarity <= .5 ? normalClarity * (clarity + .5)
+            : normalClarity + (1 - normalClarity) * (2 * clarity - 1);
+        double strength = (lighterPanel ? .68 : 1) * Math.Min(1, 2 * (1 - clarity));
         var rendered = glass.Render(pixels, width, height, size, new Rect(size), radius,
-            squircle: true, dark: false, strength: lighterPanel ? .68 : 1, tintOpacity: lighterPanel ? .035 : .08,
-            backgroundClarity: lighterPanel ? .71 : .62, launchpadOptics: true);
+            squircle: true, dark: false, strength: strength, tintOpacity: lighterPanel ? .035 : .08,
+            backgroundClarity: backgroundClarity, launchpadOptics: true);
         var frame = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, rendered, stride);
         frame.Freeze();
         return frame;

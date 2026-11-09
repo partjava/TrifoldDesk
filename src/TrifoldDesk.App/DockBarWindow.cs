@@ -38,6 +38,12 @@ public sealed class DockBarWindow : Window
 
     public event Action? LaunchpadRequested;
 
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        WindowDockService.ApplyToolWindow(this);
+    }
+
     public DockBarWindow(ConfigManager store)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
@@ -76,7 +82,11 @@ public sealed class DockBarWindow : Window
         BuildUI();
 
         Loaded += (_, _) => Reposition();
-        IsVisibleChanged += (_, _) => QueueGlassRefresh();
+        IsVisibleChanged += (_, _) =>
+        {
+            UpdateAutoHideTimer();
+            QueueGlassRefresh();
+        };
         DpiChanged += (_, _) => QueueGlassRefresh();
 
         SizeChanged += (_, _) => Reposition();
@@ -115,7 +125,7 @@ public sealed class DockBarWindow : Window
         // Edge trigger monitor: when cursor approaches the screen bottom, reveal the dock smoothly
         _edgeTriggerTimer.Tick += (_, _) =>
         {
-            if (!_config.AutoHide) return;
+            if (!_config.AutoHide || !IsVisible) return;
 
             var screen = Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
             var pt = Forms.Cursor.Position;
@@ -148,7 +158,7 @@ public sealed class DockBarWindow : Window
                 }
             }
         };
-        _edgeTriggerTimer.Start();
+        UpdateAutoHideTimer();
 
         AllowDrop = true;
         DragOver += (_, e) =>
@@ -206,6 +216,7 @@ public sealed class DockBarWindow : Window
         autoHideCheck.Click += (_, _) =>
         {
             _config.AutoHide = autoHideCheck.IsChecked;
+            UpdateAutoHideTimer();
             if (!_config.AutoHide && _isSlidDown) SlideDock(false);
             SaveConfig();
         };
@@ -800,8 +811,15 @@ public sealed class DockBarWindow : Window
         QueueGlassRefresh();
     }
 
+    private void UpdateAutoHideTimer()
+    {
+        _edgeTriggerTimer.IsEnabled = IsVisible && _config.AutoHide;
+        if (!_edgeTriggerTimer.IsEnabled) _hideTimer.Stop();
+    }
+
     private void SlideDock(bool down)
     {
+        if (!IsVisible || !double.IsFinite(Top)) return;
         _isSlidDown = down;
         _glassRevision++;
         _glassTimer.Stop();
