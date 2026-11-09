@@ -10,4 +10,4 @@ reader.Close
 If InStr(version, "\") > 0 Or InStr(version, "/") > 0 Or InStr(version, "..") > 0 Then WScript.Quit 2
 executable = root & "\dist\v" & version & "\TrifoldDesk.exe"
 If Not files.FileExists(executable) Then WScript.Quit 3
-shell.Run Chr(34) & executable & Chr(34), 0, False
+shell.Run Chr(34) & executable & Chr(34) & " --startup --show", 0, False

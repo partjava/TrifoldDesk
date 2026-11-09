@@ -70,17 +70,40 @@ public partial class MainWindow : Window
         _tray = new TrayService(() => Dispatcher.Invoke(Reveal), () => Dispatcher.Invoke(OpenSettings), () => Dispatcher.Invoke(Exit));
         _reminders=new ReminderService(_config,occurrence=>_tray.Notify("日程提醒",occurrence.Event.Title+" · "+occurrence.StartLocal.ToString("MM月dd日 HH:mm")),message=>_loadWarning+="\n"+message,!App.IsSelfTest);
         Topmost = _settings.AlwaysOnTop; ApplyGlass(false); _ready = true; InitializePlugins(); InitializePaneMenus(); HubTabs.SelectedIndex = 3;
-        Loaded += (_, _) =>
-        {
-            _handle.Show(); Dock(); SetCollapsed(_settings.IsCollapsed, false);
-            if (!App.IsSelfTest) _dock.Show();
-            if(!_settings.AlwaysOnTop) { WindowDockService.KeepAtDesktop(this);WindowDockService.KeepAtDesktop(_handle); }
-            if (!string.IsNullOrWhiteSpace(_loadWarning)) { MessageBox.Show(this, _loadWarning, "配置恢复提示"); _viewModel.Status = "配置读取异常，原文件已保留。"; }
-            ApplyDesktopHost();
-            _leftAt = DateTime.UtcNow; _idleTimer.Start();
-        };
+        if (App.IsLoginStartup) Opacity = _dock.Opacity = 0;
+        Loaded += OnFirstLoaded;
         SystemEvents.DisplaySettingsChanged += DisplayChanged;
     }
+    private void OnFirstLoaded(object sender, RoutedEventArgs e)
+    {
+        Loaded -= OnFirstLoaded;
+        _handle.Show();
+        Dock();
+        SetCollapsed(!App.IsLoginStartup && _settings.IsCollapsed, false);
+        if (!App.IsLoginStartup && !App.IsSelfTest) _dock.Show();
+        if (!_settings.AlwaysOnTop)
+        {
+            WindowDockService.KeepAtDesktop(this);
+            WindowDockService.KeepAtDesktop(_handle);
+        }
+        ApplyDesktopHost();
+        if (App.IsLoginStartup)
+        {
+            RevealPanel(false);
+            // Keep the desktop invisible until its placement and the Dock are ready.
+            _dock.Show();
+            Opacity = _dock.Opacity = 1;
+            App.RecordLoginStartup(this);
+        }
+        if (!string.IsNullOrWhiteSpace(_loadWarning))
+        {
+            MessageBox.Show(this, _loadWarning, "配置恢复提示");
+            _viewModel.Status = "配置读取异常，原文件已保留。";
+        }
+        _leftAt = DateTime.UtcNow;
+        _idleTimer.Start();
+    }
+
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e); WindowDockService.ApplyToolWindow(this);
@@ -369,6 +392,7 @@ public partial class MainWindow : Window
     }
     private void WindowClosing(object? sender, CancelEventArgs e) { if (!_closing) { e.Cancel = true; SetCollapsed(true); } }
     internal bool HandleIsVisible => _handle.IsVisible;
+    internal int StartupDockItemCount => _dock.PinnedItemCount;
     internal bool CollapsedForTest => _collapsed;
     internal bool MonitorSampleReceived { get; private set; }
     internal void TestCollapse() => SetCollapsed(true);

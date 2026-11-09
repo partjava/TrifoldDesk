@@ -13,11 +13,13 @@ public partial class App : Application
     private Exception? _selfTestFailure;
     public static string DataDirectory { get; private set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TrifoldDesk");
     public static bool IsSelfTest {get;private set;}
-    protected override void OnStartup(StartupEventArgs e)
+    internal static bool IsLoginStartup { get; private set; }
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         bool selfTest = e.Args.Contains("--self-test");
         IsSelfTest=selfTest;
+        IsLoginStartup = !selfTest && e.Args.Contains("--startup");
         if (selfTest)
         {
             int index = Array.IndexOf(e.Args, "--data-dir");
@@ -47,8 +49,15 @@ public partial class App : Application
         };
         try
         {
+            if (IsLoginStartup)
+            {
+                // Explorer and the roaming profile can still be starting when Windows runs this entry.
+                for (int attempt = 0; attempt < 24 && !LoginDesktopReady(); attempt++)
+                    await Task.Delay(500);
+                if (_exitEvent.WaitOne(0)) { Shutdown(); return; }
+            }
             var window = new MainWindow(); MainWindow = window; window.Show();
-            if (e.Args.Contains("--show")) window.Reveal();
+            if (!IsLoginStartup && e.Args.Contains("--show")) window.Reveal();
             if (selfTest) { _ = RunSelfTest(window); return; }
             _listenerStop = new CancellationTokenSource();
             var stop = _listenerStop.Token;
@@ -65,6 +74,30 @@ public partial class App : Application
         }
         catch (Exception ex) { Log(ex); MessageBox.Show(ex.Message, "TrifoldDesk 启动失败"); Shutdown(1); }
     }
+
+    private static bool LoginDesktopReady() =>
+        FindWindow("Shell_TrayWnd", null) != IntPtr.Zero &&
+        (File.Exists(Path.Combine(DataDirectory, "dock.json")) ||
+         File.Exists(Path.Combine(DataDirectory, "dock.json.bak")));
+
+    internal static void RecordLoginStartup(MainWindow window)
+    {
+        try
+        {
+            File.WriteAllLines(Path.Combine(DataDirectory, "startup.log"),
+            [
+                $"Time: {DateTimeOffset.Now:O}",
+                $"Executable: {Environment.ProcessPath}",
+                $"Profile: {DataDirectory}",
+                $"Dock items: {window.StartupDockItemCount}",
+                $"Desktop visible: {window.IsVisible}"
+            ]);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log(ex); }
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr FindWindow(string className, string? windowName);
     private async Task RunSelfTest(MainWindow window)
     {
         var lines = new List<string>();

@@ -37,6 +37,7 @@ public sealed class DockBarWindow : Window
     private DockItem? _dockDraggedItem;
 
     public event Action? LaunchpadRequested;
+    internal int PinnedItemCount => _config.Items.Count;
 
     protected override void OnSourceInitialized(EventArgs e)
     {
@@ -64,15 +65,16 @@ public sealed class DockBarWindow : Window
         if (!primaryExists && !backupExists)
         {
             _config = PopulateInitialDock(_store);
-            SaveConfig();
+            // During login a temporarily unavailable profile must not be replaced with defaults.
+            if (!App.IsLoginStartup) SaveConfig();
         }
         else
         {
             _config.Items ??= [];
             // Auto deduplicate any legacy duplicate entries
             _config = DockRules.Deduplicate(_config);
-            if (loaded.Warning is not null) Loaded += (_, _) =>
-                MessageBox.Show(loaded.Warning, "Dock 配置读取提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (loaded.Warning is not null) Loaded += (_, _) => Dispatcher.BeginInvoke(() =>
+                MessageBox.Show(loaded.Warning, "Dock 配置读取提示", MessageBoxButton.OK, MessageBoxImage.Warning));
         }
 
         Topmost = _config.AlwaysOnTop;
