@@ -70,6 +70,38 @@ public static class ShellLinkHelper
         foreach (string argument in plan.ArgumentList) start.ArgumentList.Add(argument);
         Process.Start(start);
     }
+    internal static void LaunchApplication(string name, string target, string arguments, bool admin)
+    {
+        try
+        {
+            const string appsFolder = "shell:AppsFolder\\";
+            string appId = target.StartsWith(appsFolder, StringComparison.OrdinalIgnoreCase)
+                ? target[appsFolder.Length..] : target;
+            if (System.Text.RegularExpressions.Regex.IsMatch(appId, @"^[\w.-]+_[a-zA-Z0-9]{13}![\w.-]+$"))
+            {
+                if (admin) throw new InvalidOperationException("此应用由 Windows 启动，无法从这里以管理员身份运行。");
+                target = SaveShellAppLink(new InstalledApp(name, appId));
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = target,
+                Arguments = arguments,
+                UseShellExecute = true,
+                Verb = admin ? "runas" : ""
+            });
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            // The user cancelled the Windows elevation prompt.
+        }
+        catch (Exception ex)
+        {
+            App.Log(ex);
+            MessageBox.Show($"无法打开「{name}」。\n{ex.Message}", "启动失败",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
     public static void ShowInFolder(ShortcutItem item)
     {
         if (!SourceExists(item)) throw new FileNotFoundException("原文件不存在，请重新定位。", item.SourcePath);

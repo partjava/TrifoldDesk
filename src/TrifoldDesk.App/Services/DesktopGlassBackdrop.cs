@@ -24,7 +24,6 @@ internal static class DesktopGlassBackdrop
         public long LastRequest = -1000;
         public long LastFrame;
         public long LastUse;
-        public WallpaperWindowCapture? GpuCapture;
     }
 
     public static bool TryCapture(Drawing.Bitmap destination, Drawing.Rectangle capture, Drawing.Rectangle visible)
@@ -98,8 +97,8 @@ internal static class DesktopGlassBackdrop
                     || process == shellProcess || process == (uint)Environment.ProcessId
                     || !GetWindowRect(child, out var rect) || !rect.Bounds.Contains(screen))
                     return true;
-                // WGC accepts top-level windows only. Capturing Explorer's root
-                // returns its wallpaper surface, without ordinary overlaid apps.
+                // The desktop root can print the composed wallpaper surface,
+                // even when the wallpaper's own child window cannot.
                 nint root = GetAncestor(child, 2);
                 if (root == 0 || !GetWindowRect(root, out var rootRect)) return true;
                 match = new Source(root, rootRect.Bounds, true);
@@ -121,29 +120,6 @@ internal static class DesktopGlassBackdrop
             Frames.Add(source, frame);
         }
         frame.LastUse = now;
-        if (source.LiveWallpaper)
-        {
-            try
-            {
-                if (frame.GpuCapture is null)
-                {
-                    if (now - frame.LastRequest < 1000) return false;
-                    frame.LastRequest = now;
-                    frame.GpuCapture = new WallpaperWindowCapture(source.Window);
-                }
-                using var image = frame.GpuCapture.CopyLatest();
-                if (image is null) return false;
-                var input = new Drawing.Rectangle(slice.X - source.Bounds.X, slice.Y - source.Bounds.Y,
-                    slice.Width, slice.Height);
-                graphics.DrawImage(image, target, input, Drawing.GraphicsUnit.Pixel);
-                return true;
-            }
-            catch (Exception error) when (error is ExternalException or InvalidOperationException or NotSupportedException or ArgumentException)
-            {
-                System.Diagnostics.Debug.WriteLine(error);
-                return false;
-            }
-        }
         FinishCapture(frame);
         if (frame.Pending is null && now - frame.LastRequest >= (frame.Image is null ? 1000 : 250))
         {
@@ -175,7 +151,6 @@ internal static class DesktopGlassBackdrop
             if (now - frame.LastUse <= 3000 || frame.Pending is { IsCompleted: false }) continue;
             FinishCapture(frame);
             frame.Image?.Dispose();
-            frame.GpuCapture?.Dispose();
             Frames.Remove(source);
         }
     }
@@ -186,7 +161,6 @@ internal static class DesktopGlassBackdrop
         {
             foreach (var frame in Frames.Values)
             {
-                frame.GpuCapture?.Dispose();
                 frame.Image?.Dispose();
                 if (frame.Pending is { } pending)
                     _ = pending.ContinueWith(task => { if (task.IsCompletedSuccessfully) task.Result?.Dispose(); }, TaskScheduler.Default);

@@ -828,22 +828,8 @@ public sealed class LaunchpadWindow : Window
 
     private static void LaunchApp(InstalledApp app, bool admin = false)
     {
-        try
-        {
-            string target = string.IsNullOrEmpty(app.TargetPath) ? app.ShellPath : app.TargetPath;
-            var psi = new ProcessStartInfo
-            {
-                FileName = target,
-                Arguments = app.Arguments,
-                UseShellExecute = true,
-                Verb = admin ? "runas" : ""
-            };
-            Process.Start(psi);
-        }
-        catch (Exception ex)
-        {
-            App.Log(ex);
-        }
+        string target = string.IsNullOrEmpty(app.TargetPath) ? app.ShellPath : app.TargetPath;
+        ShellLinkHelper.LaunchApplication(app.DisplayName, target, app.Arguments, admin);
     }
 
     private static void ShowInFolder(InstalledApp app)

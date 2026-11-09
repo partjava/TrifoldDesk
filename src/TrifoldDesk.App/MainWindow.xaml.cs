@@ -42,7 +42,7 @@ public partial class MainWindow : Window
         var settings = _config.Load<AppSettings>("settings.json"); _settings = settings.Value;
         GlassCapturePolicy.Configure(_settings.GlassBackdropMode, _settings.RemoteGlassCompatibility, _settings.GlassClarity);
         // Legacy panel preferences must not override permanent desktop behavior.
-        _settings.AlwaysOnTop = false; _settings.AutoCollapse = false; _settings.HoverExpand = false; _settings.IsCollapsed = false;
+        _settings.AlwaysOnTop = false; _settings.AutoCollapse = false; _settings.HoverExpand = false;
         if(!App.IsSelfTest)_settings.StartWithWindows=SystemActionService.AutoStartRegistered();
         _settings.GlassOpacity = Math.Clamp(_settings.GlassOpacity, .05, .55);
         var shortcuts = _config.Load<ShortcutConfig>("shortcuts.json");

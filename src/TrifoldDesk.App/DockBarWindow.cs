@@ -56,22 +56,23 @@ public sealed class DockBarWindow : Window
         ShowActivated = false;
         SizeToContent = SizeToContent.WidthAndHeight;
 
-        var loaded = _store.Load<DockConfig>("dock.json");
+        string configPath = Path.Combine(_store.DirectoryPath, "dock.json");
+        bool primaryExists = File.Exists(configPath);
+        bool backupExists = File.Exists(configPath + ".bak");
+        var loaded = _store.Load<DockConfig>(!primaryExists && backupExists ? "dock.json.bak" : "dock.json");
         _config = loaded.Value;
-        if (_config.Items.Count == 0)
+        if (!primaryExists && !backupExists)
         {
             _config = PopulateInitialDock(_store);
-            try { _store.Save("dock.json", _config); } catch { /* ignore */ }
+            SaveConfig();
         }
         else
         {
+            _config.Items ??= [];
             // Auto deduplicate any legacy duplicate entries
-            int beforeCount = _config.Items.Count;
             _config = DockRules.Deduplicate(_config);
-            if (_config.Items.Count != beforeCount)
-            {
-                try { _store.Save("dock.json", _config); } catch { /* ignore */ }
-            }
+            if (loaded.Warning is not null) Loaded += (_, _) =>
+                MessageBox.Show(loaded.Warning, "Dock 配置读取提示", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         Topmost = _config.AlwaysOnTop;
@@ -685,22 +686,7 @@ public sealed class DockBarWindow : Window
 
     private void LaunchApp(DockItem item, bool admin = false)
     {
-        try
-        {
-            string path = ResolveTargetPath(item.TargetPath);
-            var psi = new ProcessStartInfo
-            {
-                FileName = path,
-                Arguments = item.Arguments,
-                UseShellExecute = true,
-                Verb = admin ? "runas" : ""
-            };
-            Process.Start(psi);
-        }
-        catch (Exception ex)
-        {
-            App.Log(ex);
-        }
+        ShellLinkHelper.LaunchApplication(item.Name, ResolveTargetPath(item.TargetPath), item.Arguments, admin);
     }
 
     private static void ShowInFolder(DockItem item)
@@ -945,7 +931,12 @@ public sealed class DockBarWindow : Window
     private void SaveConfig()
     {
         try { _store.Save("dock.json", _config); }
-        catch (Exception ex) { App.Log(ex); }
+        catch (Exception ex)
+        {
+            App.Log(ex);
+            MessageBox.Show($"Dock 设置保存失败，重启后可能无法保留本次修改。\n{ex.Message}",
+                "Dock 设置", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     public void PinItem(DockItem item)
