@@ -78,32 +78,32 @@
       <TabItem x:Name="ControlPluginTab" Header="控制"><ScrollViewer x:Name="ControlsContent" VerticalScrollBarVisibility="Hidden">
        <ScrollViewer.Resources>
         <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-         <Setter Property="Foreground" Value="#182B3D"/>
-         <Setter Property="Effect"><Setter.Value><DropShadowEffect Color="White" ShadowDepth="0" BlurRadius="4" Opacity="0.9"/></Setter.Value></Setter>
+         <Setter Property="Foreground" Value="#FFF4F7FA"/>
+         <Setter Property="Effect"><Setter.Value><DropShadowEffect Color="#101720" ShadowDepth="1" BlurRadius="4" Opacity="0.9"/></Setter.Value></Setter>
         </Style>
         <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-         <Setter Property="Foreground" Value="#182B3D"/>
-         <Setter Property="Background" Value="#A6FFFFFF"/>
-         <Setter Property="BorderBrush" Value="#708696A6"/>
+         <Setter Property="Foreground" Value="#FFF4F7FA"/>
+         <Setter Property="Background" Value="Transparent"/>
+         <Setter Property="BorderBrush" Value="#45FFFFFF"/>
         </Style>
        </ScrollViewer.Resources>
        <StackPanel Margin="0,0,4,0">
        <TextBlock Text="系统快捷设置" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,12"/>
        <UniformGrid Columns="3">
-        <Button Tag="ms-settings:network-wifi" Click="SystemSettingsClick" Margin="0,0,6,8" Padding="4,14"><StackPanel><TextBlock Text="&#xE701;" FontFamily="Segoe MDL2 Assets" FontSize="23" HorizontalAlignment="Center"/><TextBlock Text="Wi-Fi" Margin="0,10,0,0" HorizontalAlignment="Center"/><TextBlock Text="管理设备" FontSize="9" Foreground="#31475A" HorizontalAlignment="Center"/></StackPanel></Button>
-        <Button Tag="ms-settings:bluetooth" Click="SystemSettingsClick" Margin="0,0,6,8" Padding="4,14"><StackPanel><TextBlock Text="&#xE702;" FontFamily="Segoe MDL2 Assets" FontSize="23" HorizontalAlignment="Center"/><TextBlock Text="蓝牙" Margin="0,10,0,0" HorizontalAlignment="Center"/><TextBlock Text="管理设备" FontSize="9" Foreground="#31475A" HorizontalAlignment="Center"/></StackPanel></Button>
-        <Button Tag="ms-settings:network-airplanemode" Click="SystemSettingsClick" Margin="0,0,0,8" Padding="4,14"><StackPanel><TextBlock Text="&#xE709;" FontFamily="Segoe MDL2 Assets" FontSize="23" HorizontalAlignment="Center"/><TextBlock Text="飞行模式" Margin="0,10,0,0" HorizontalAlignment="Center"/><TextBlock Text="打开设置" FontSize="9" Foreground="#31475A" HorizontalAlignment="Center"/></StackPanel></Button>
-        <Button Tag="ms-settings:easeofaccess" Click="SystemSettingsClick" Margin="0,0,6,8" Padding="4,12"><TextBlock Text="辅助功能 ↗" Foreground="#182B3D"/></Button>
-        <Button Tag="ms-settings:powersleep" Click="SystemSettingsClick" Margin="0,0,6,8" Padding="4,12"><TextBlock Text="电源与节能 ↗" Foreground="#182B3D"/></Button>
-        <Button Tag="ms-settings:easeofaccess-closedcaptioning" Click="SystemSettingsClick" Margin="0,0,0,8" Padding="4,12"><TextBlock Text="字幕设置 ↗" Foreground="#182B3D"/></Button>
+        <Button Tag="ms-settings:network-wifi" Click="SystemSettingsClick" Margin="0,0,6,8" Padding="4,14"><StackPanel><TextBlock Text="&#xE701;" FontFamily="Segoe MDL2 Assets" FontSize="23" HorizontalAlignment="Center"/><TextBlock Text="Wi-Fi" Margin="0,10,0,0" HorizontalAlignment="Center"/><TextBlock Text="管理设备" FontSize="9" Foreground="#FFDCE7F0" HorizontalAlignment="Center"/></StackPanel></Button>
+        <Button Tag="ms-settings:bluetooth" Click="SystemSettingsClick" Margin="0,0,6,8" Padding="4,14"><StackPanel><TextBlock Text="&#xE702;" FontFamily="Segoe MDL2 Assets" FontSize="23" HorizontalAlignment="Center"/><TextBlock Text="蓝牙" Margin="0,10,0,0" HorizontalAlignment="Center"/><TextBlock Text="管理设备" FontSize="9" Foreground="#FFDCE7F0" HorizontalAlignment="Center"/></StackPanel></Button>
+        <Button Tag="ms-settings:network-airplanemode" Click="SystemSettingsClick" Margin="0,0,0,8" Padding="4,14"><StackPanel><TextBlock Text="&#xE709;" FontFamily="Segoe MDL2 Assets" FontSize="23" HorizontalAlignment="Center"/><TextBlock Text="飞行模式" Margin="0,10,0,0" HorizontalAlignment="Center"/><TextBlock Text="打开设置" FontSize="9" Foreground="#FFDCE7F0" HorizontalAlignment="Center"/></StackPanel></Button>
+        <Button Tag="ms-settings:easeofaccess" Click="SystemSettingsClick" Margin="0,0,6,8" Padding="4,12"><TextBlock Text="辅助功能 ↗" Foreground="#FFF4F7FA"/></Button>
+        <Button Tag="ms-settings:powersleep" Click="SystemSettingsClick" Margin="0,0,6,8" Padding="4,12"><TextBlock Text="电源与节能 ↗" Foreground="#FFF4F7FA"/></Button>
+        <Button Tag="ms-settings:easeofaccess-closedcaptioning" Click="SystemSettingsClick" Margin="0,0,0,8" Padding="4,12"><TextBlock Text="字幕设置 ↗" Foreground="#FFF4F7FA"/></Button>
        </UniformGrid>
-       <Border Background="#A6FFFFFF" CornerRadius="14" Padding="16" Margin="0,12,0,12"><StackPanel>
+       <Border Background="Transparent" CornerRadius="14" Padding="16" Margin="0,12,0,12"><StackPanel>
         <Grid><TextBlock Text="系统音量"/><TextBlock x:Name="VolumeLabel" HorizontalAlignment="Right" Text="读取中"/></Grid><Slider x:Name="VolumeSlider" Minimum="0" Maximum="100" ValueChanged="VolumeChanged" IsEnabled="False" Margin="0,12,0,8"/>
-        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button x:Name="MuteButton" Click="MuteClick" IsEnabled="False" Padding="10,6" Content="静音"><Button.ContentTemplate><DataTemplate><TextBlock Text="{Binding}" Foreground="#182B3D"/></DataTemplate></Button.ContentTemplate></Button><Button Grid.Column="1" Tag="ms-settings:sound" Click="SystemSettingsClick" Padding="10,6" Margin="8,0,0,0"><TextBlock Text="声音设置 ↗" Foreground="#182B3D"/></Button></Grid>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button x:Name="MuteButton" Click="MuteClick" IsEnabled="False" Padding="10,6" Content="静音"><Button.ContentTemplate><DataTemplate><TextBlock Text="{Binding}" Foreground="#FFF4F7FA"/></DataTemplate></Button.ContentTemplate></Button><Button Grid.Column="1" Tag="ms-settings:sound" Click="SystemSettingsClick" Padding="10,6" Margin="8,0,0,0"><TextBlock Text="声音设置 ↗" Foreground="#FFF4F7FA"/></Button></Grid>
        </StackPanel></Border>
-       <Border Background="#A6FFFFFF" CornerRadius="14" Padding="16" Margin="0,0,0,16"><StackPanel><Grid><TextBlock Text="屏幕亮度"/><TextBlock x:Name="BrightnessLabel" HorizontalAlignment="Right" Text="读取中" FontSize="12"/></Grid><Slider x:Name="BrightnessSlider" ValueChanged="BrightnessChanged" Minimum="0" Maximum="100" IsEnabled="False" PreviewMouseLeftButtonUp="BrightnessReleased" PreviewKeyUp="BrightnessKeyUp" Margin="0,12,0,8"/><Button Tag="ms-settings:display" Click="SystemSettingsClick" Padding="10,6"><TextBlock Text="显示设置 ↗" Foreground="#182B3D"/></Button></StackPanel></Border>
-       <UniformGrid Columns="2"><Button Click="AwakeClick" Margin="0,0,6,8"><TextBlock Text="{Binding AwakeLabel}" Foreground="#182B3D"/></Button><Button Click="RecycleClick" Margin="0,0,0,8"><TextBlock Text="清空回收站" Foreground="#182B3D"/></Button><Button Tag="ms-settings:taskbar" Click="SystemSettingsClick" Margin="0,0,6,8"><TextBlock Text="任务栏与托盘 ↗" Foreground="#182B3D"/></Button><Button Tag="ms-settings:personalization" Click="SystemSettingsClick" Margin="0,0,0,8"><TextBlock Text="桌面个性化 ↗" Foreground="#182B3D"/></Button></UniformGrid>
-       <Border Background="#A6FFFFFF" CornerRadius="14" Padding="16" Margin="0,12,0,0"><StackPanel><TextBlock Text="{Binding ClockText}" FontSize="36"/><TextBlock Text="{Binding DateText}" Margin="0,6,0,8"/><TextBlock Text="{Binding BatteryText}" Foreground="#175D79"/></StackPanel></Border>
+       <Border Background="Transparent" CornerRadius="14" Padding="16" Margin="0,0,0,16"><StackPanel><Grid><TextBlock Text="屏幕亮度"/><TextBlock x:Name="BrightnessLabel" HorizontalAlignment="Right" Text="读取中" FontSize="12"/></Grid><Slider x:Name="BrightnessSlider" ValueChanged="BrightnessChanged" Minimum="0" Maximum="100" IsEnabled="False" PreviewMouseLeftButtonUp="BrightnessReleased" PreviewKeyUp="BrightnessKeyUp" Margin="0,12,0,8"/><Button Tag="ms-settings:display" Click="SystemSettingsClick" Padding="10,6"><TextBlock Text="显示设置 ↗" Foreground="#FFF4F7FA"/></Button></StackPanel></Border>
+       <UniformGrid Columns="2"><Button Click="AwakeClick" Margin="0,0,6,8"><TextBlock Text="{Binding AwakeLabel}" Foreground="#FFF4F7FA"/></Button><Button Click="RecycleClick" Margin="0,0,0,8"><TextBlock Text="清空回收站" Foreground="#FFF4F7FA"/></Button><Button Tag="ms-settings:taskbar" Click="SystemSettingsClick" Margin="0,0,6,8"><TextBlock Text="任务栏与托盘 ↗" Foreground="#FFF4F7FA"/></Button><Button Tag="ms-settings:personalization" Click="SystemSettingsClick" Margin="0,0,0,8"><TextBlock Text="桌面个性化 ↗" Foreground="#FFF4F7FA"/></Button></UniformGrid>
+       <Border Background="Transparent" CornerRadius="14" Padding="16" Margin="0,12,0,0"><StackPanel><TextBlock Text="{Binding ClockText}" FontSize="36"/><TextBlock Text="{Binding DateText}" Margin="0,6,0,8"/><TextBlock Text="{Binding BatteryText}" Foreground="#FFC4E9F7"/></StackPanel></Border>
       </StackPanel></ScrollViewer></TabItem>
      <TabItem Header="桌面插件"><ScrollViewer VerticalScrollBarVisibility="Hidden"><StackPanel x:Name="RightWidgetHost" Margin="0,8,4,0"/></ScrollViewer></TabItem></TabControl>
      <Grid Grid.Row="2" Margin="0,18,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button Grid.Column="1" Content="＋ 插件库" Click="PluginLibraryClick" Padding="10,7"/></Grid>
